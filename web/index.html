@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NESTfi Risk Profile Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="dev-bar">
+  <span class="dev-label">Dev</span>
+  <button onclick="toggleOffline()" id="btn-offline">Offline: off</button>
+  <button onclick="toggleSaveFail()" id="btn-savefail">Save fail: off</button>
+  <button onclick="toggleEmailFail()" id="btn-emailfail">Email fail: off</button>
+  <select id="persona-select" onchange="loadPersona(this.value)">
+    <option value="">Load persona...</option>
+    <option value="arjun">Arjun, 29, salaried</option>
+    <option value="meera">Meera, 41, two children</option>
+    <option value="ramesh">Ramesh, 63, retired</option>
+    <option value="kavya">Kavya, 34, consultant</option>
+    <option value="suresh">Suresh, 47, business owner</option>
+    <option value="priya">Priya, 38, satellite investor</option>
+    <option value="vikram">Vikram, 44, sold in fall</option>
+    <option value="ananya">Ananya, 15, minor account</option>
+  </select>
+  <button onclick="resetAll()">Reset</button>
+</div>
+<div id="layout">
+  <div id="phone-frame">
+    <div id="phone" class="phone"></div>
+  </div>
+  <div id="workings-panel">
+    <h3>Workings</h3>
+    <div id="workings-content">Submit answers to see workings.</div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
