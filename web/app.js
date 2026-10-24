@@ -11,6 +11,7 @@ let simOffline = false;
 let simSaveFail = false;
 let simEmailFail = false;
 let lastSaveError = false;
+let returnToResult = false; // when changing answers from result screen
 
 // 15 questions in flow order (STRESS between T6_seed and R1)
 const flowOrder = ['A1','A2','A3','A4','A5','A6','A7','A8','T1','T2','T4','T5','T6_seed','STRESS','R1'];
@@ -52,7 +53,6 @@ async function apiSaveAnswer(code, optionId) {
 
 async function apiConfirm() {
   if (simEmailFail) {
-    // Save all answers first, then simulate email failure
     const res = await fetch(`${API}/risk-profile/confirm`, { method: 'POST' });
     const data = await res.json();
     if (res.ok) {
@@ -165,6 +165,7 @@ function renderIntro() {
 }
 
 // ---------------------------------------------------------------- screen: question (3-7)
+// Tap an option → saves and auto-advances. No Continue button.
 
 function renderQuestion() {
   const code = flowOrder[currentQ];
@@ -177,7 +178,7 @@ function renderQuestion() {
   if (simOffline) banner = `<div class="banner-offline"><span class="icon">&#9432;</span><span>You're offline. Your answers are saved on this phone.</span></div>`;
 
   let errorBanner = '';
-  if (lastSaveError) errorBanner = `<div class="banner-error"><span class="icon">&#9888;</span><span style="flex:1">Answer not saved. Check your connection.</span><button class="retry-btn" onclick="retryAnswer()">Retry</button></div>`;
+  if (lastSaveError) errorBanner = `<div class="banner-error" style="margin:0 20px 20px"><span class="icon">&#9888;</span><span style="flex:1">Answer not saved. Check your connection.</span><button class="retry-btn" onclick="retryAnswer()">Retry</button></div>`;
 
   return `
     <div class="screen">
@@ -196,7 +197,6 @@ function renderQuestion() {
             <span class="tick">&#10003;</span>
           </div>`).join('')}
       </div>
-      ${selected && !lastSaveError ? `<div class="btn-bottom"><button class="btn-primary" onclick="nextQuestion()">Continue</button></div>` : ''}
       ${errorBanner}
     </div>`;
 }
@@ -265,27 +265,30 @@ function renderRupee() {
 // ---------------------------------------------------------------- screen: confirm (10)
 
 function renderConfirm() {
-  // Preview from workings
-  const w = lastWorkings;
-  if (!w || !w.profile) {
-    return `<div class="screen"><div class="question-text">Computing profile...</div></div>`;
-  }
-  const p = w.profile;
   const anchor = anchorData();
+  // Use confirmed result if available, otherwise show labels from answers
+  const absorb = confirmedResult ? confirmedResult.summary.absorb : '—';
+  const approach = confirmedResult ? confirmedResult.summary.approach : '—';
+  const exp = experienceLabel();
+  // If workings has a profile, use that for the preview
+  const w = lastWorkings;
+  const previewAbsorb = (w && w.profile) ? w.profile.ability_band : absorb;
+  const previewApproach = (w && w.profile) ? approachLabel(w.profile.tolerance_band) : approach;
+
   return `
     <div class="screen">
       <button class="back-btn" onclick="currentScreen='rupee';render()">&#8249;</button>
       <div style="font-size:28px;font-weight:700;margin:8px 0 24px">Your profile</div>
       <div class="summary-card">
-        <div class="summary-row"><div class="label">What your household can absorb</div><div class="value">${p.ability_band}</div></div>
-        <div class="summary-row"><div class="label">How you approach risk</div><div class="value">${approachLabel(p.tolerance_band)}</div></div>
-        <div class="summary-row"><div class="label">Investing experience</div><div class="value">${experienceLabel()}</div></div>
+        <div class="summary-row"><div class="label">What your household can absorb</div><div class="value">${previewAbsorb}</div></div>
+        <div class="summary-row"><div class="label">How you approach risk</div><div class="value">${previewApproach}</div></div>
+        <div class="summary-row"><div class="label">Investing experience</div><div class="value">${exp}</div></div>
         <div class="summary-row highlighted"><div class="label">The fall you'd sit through</div><div class="value">${anchor.pct}%, Rs ${anchor.rs} on a lakh</div></div>
       </div>
       <div style="font-size:14px;color:var(--text-secondary);margin-bottom:16px">A copy goes to demo@nestfi.in.</div>
       <div class="btn-bottom">
         <button class="btn-primary" onclick="doConfirm()">These are right</button>
-        <button class="btn-secondary" style="margin-top:8px" onclick="currentScreen='change';render()">Change an answer</button>
+        <button class="btn-secondary" style="margin-top:8px" onclick="returnToResult=false;currentScreen='change';render()">Change an answer</button>
       </div>
     </div>`;
 }
@@ -294,8 +297,9 @@ function renderConfirm() {
 
 function renderChangeAnswers() {
   let html = `<div class="screen">
-    <button class="back-btn" onclick="currentScreen='confirm';render()">&#8249;</button>
-    <div style="font-size:28px;font-weight:700;margin:8px 0 16px">Your answers</div>`;
+    <button class="back-btn" onclick="currentScreen='${returnToResult ? 'result' : 'confirm'}';render()">&#8249;</button>
+    <div style="font-size:28px;font-weight:700;margin:8px 0 16px">Your answers</div>
+    <div style="flex:1;overflow-y:auto">`;
   let lastSection = '';
   for (let i = 0; i < flowOrder.length; i++) {
     const code = flowOrder[i];
@@ -312,7 +316,7 @@ function renderChangeAnswers() {
       <div style="flex:1"><div class="answer-q">${q.text.substring(0, 60)}${q.text.length > 60 ? '...' : ''}</div><div class="answer-a">${opt ? opt.label : '—'}</div></div>
       <div class="answer-chevron">&#8250;</div></div>`;
   }
-  html += `</div>`;
+  html += `</div></div>`;
   return html;
 }
 
@@ -370,7 +374,10 @@ function renderResult() {
         <div class="info-row"><div class="label">Largest fall at Level ${level}, ${r.largestFall.period}</div><div class="value">Rs ${fall} on a lakh</div></div>
       </div>
       <div style="font-size:14px;color:var(--text-secondary);line-height:1.4;margin-bottom:16px">Levels open as your circumstances, learning and investing record change.</div>
-      <div class="btn-bottom"><button class="btn-primary" onclick="goScreen('doorway')">Continue to agreement</button></div>
+      <div class="btn-bottom">
+        <button class="btn-primary" onclick="goScreen('doorway')">Continue to agreement</button>
+        <button class="btn-secondary" style="margin-top:8px" onclick="returnToResult=true;currentScreen='change';render()">Change an answer</button>
+      </div>
     </div>`;
 }
 
@@ -422,35 +429,45 @@ function anchorData() {
 function goScreen(s) { currentScreen = s; render(); }
 
 function startQuestions() {
-  // Resume: land on first unanswered
   for (let i = 0; i < flowOrder.length; i++) {
     const code = flowOrder[i];
     if (code === 'STRESS') { if (!stressAnswer) { currentQ = i; currentScreen = 'stress'; render(); return; } }
     else { if (!answers[code]) { currentQ = i; currentScreen = code === 'R1' ? 'rupee' : 'question'; render(); return; } }
   }
-  // All answered — go to confirm
   currentScreen = 'confirm';
   render();
 }
 
+// Tap an option → save, brief highlight, then auto-advance
 async function selectOption(code, optionId) {
   answers[code] = optionId;
   lastSaveError = false;
-  render();
+  render(); // show selection highlight
   await apiSaveAnswer(code, optionId);
-  render();
+  if (lastSaveError) { render(); return; } // stay on this question if save failed
   await updateWorkings();
+  // Auto-advance after a short pause so the user sees the tick
+  setTimeout(() => { nextQuestion(); }, 250);
 }
 
 async function retryAnswer() {
   const code = flowOrder[currentQ];
   const optId = answers[code];
-  if (optId) { lastSaveError = false; simSaveFail = false; await apiSaveAnswer(code, optId); render(); }
+  if (optId) {
+    lastSaveError = false;
+    simSaveFail = false;
+    await apiSaveAnswer(code, optId);
+    if (!lastSaveError) {
+      await updateWorkings();
+      setTimeout(() => { nextQuestion(); }, 250);
+    }
+    render();
+  }
 }
 
 function nextQuestion() {
   currentQ++;
-  if (currentQ >= flowOrder.length) { currentScreen = 'confirm'; render(); return; }
+  if (currentQ >= flowOrder.length) { currentScreen = 'confirm'; updateWorkings(); render(); return; }
   const code = flowOrder[currentQ];
   if (code === 'STRESS') currentScreen = 'stress';
   else if (code === 'R1') currentScreen = 'rupee';
@@ -546,7 +563,6 @@ async function loadPersona(name) {
     else { answers[code] = optId; }
     await apiSaveAnswer(code, optId);
   }
-  // Go to confirm screen
   currentScreen = 'confirm';
   await updateWorkings();
   render();
@@ -561,6 +577,7 @@ async function resetAll() {
   currentScreen = 'doorway';
   currentQ = 0;
   lastSaveError = false;
+  returnToResult = false;
   await updateWorkings();
   render();
 }
@@ -595,7 +612,6 @@ async function updateWorkings() {
 
   if (p) {
     html += '<div class="wk-divider"></div>';
-    // Ability
     html += '<div class="wk-section"><h4>Ability (Factor 1)</h4>';
     html += `<div class="wk-row"><span class="wk-label">Score</span><span class="wk-value">${p.ability_score}</span></div>`;
     html += `<div class="wk-row"><span class="wk-label">Band</span><span class="wk-value">${p.ability_band}</span></div>`;
@@ -604,7 +620,6 @@ async function updateWorkings() {
     html += '</div>';
 
     html += '<div class="wk-divider"></div>';
-    // Tolerance
     html += '<div class="wk-section"><h4>Tolerance (Factor 2)</h4>';
     html += `<div class="wk-row"><span class="wk-label">Total</span><span class="wk-value">${p.tolerance_total}</span></div>`;
     html += `<div class="wk-row"><span class="wk-label">Band</span><span class="wk-value">${p.tolerance_band}</span></div>`;
@@ -614,7 +629,6 @@ async function updateWorkings() {
     html += '</div>';
 
     html += '<div class="wk-divider"></div>';
-    // Reconcile
     html += '<div class="wk-section"><h4>Reconcile</h4>';
     html += `<div class="wk-row"><span class="wk-label">Teaching ceiling</span><span class="wk-value">${p.literacy_ceiling ?? 'null'}</span></div>`;
     html += `<div class="wk-row"><span class="wk-label">Binding</span><span class="wk-value binding">${p.binding_constraint}</span></div>`;
@@ -641,7 +655,6 @@ async function updateWorkings() {
   el.innerHTML = html;
 }
 
-// Loss curve: 2 + 32 * (s/100)^1.1, rounded to 1 decimal
 function lossCurve(score) {
   const s = Math.min(Math.max(score, 0), 100) / 100;
   return (2 + 32 * Math.pow(s, 1.1)).toFixed(1);
