@@ -1,6 +1,6 @@
 import express from 'express';
 import path from 'path';
-import { loadConfig } from './riskProfile/engine';
+import { loadConfig, ability, tolerance, reconcile, stressSeedScore, resolveOptionId, NeedInput } from './riskProfile/engine';
 import { RiskProfileDB } from './riskProfile/db';
 import { RiskProfileService, ApiError } from './riskProfile/service';
 
@@ -91,14 +91,74 @@ app.get('/api/workings', (_req, res) => {
   const drafts: Record<string, string> = {};
   for (const [k, v] of inv.draft_answers.entries()) drafts[k] = v.option_id;
 
-  const profile = db.latestProfile('demo');
   const composure = db.findComposureState('demo');
+
+  // Compute a live preview from draft answers (the engine runs server-side)
+  let preview: any = null;
+  const abilityCodes = ['A1','A2','A3','A4','A5','A6','A7','A8'];
+  const tolCodes = ['T1','T2','T4','T5','T6_seed'];
+  const hasAbility = abilityCodes.every(c => drafts[c]);
+  const hasTol = tolCodes.every(c => drafts[c]);
+
+  if (hasAbility) {
+    try {
+      const abilityAnswers: Record<string, string> = {};
+      for (const c of abilityCodes) {
+        const r = resolveOptionId(drafts[c]);
+        if (r) abilityAnswers[c] = r.option;
+      }
+      const ab = ability(abilityAnswers);
+
+      if (hasTol && drafts['R1']) {
+        const tolAnswers: Record<string, string> = {};
+        for (const c of tolCodes) {
+          const r = resolveOptionId(drafts[c]);
+          if (r) tolAnswers[c] = r.option;
+        }
+        const r1 = resolveOptionId(drafts['R1']);
+        const anchorPct = r1 ? r1.points : null;
+        const tol = tolerance(tolAnswers, null, null, anchorPct, 3);
+        const need: NeedInput = { stated: false, level: null, status: 'no goal stated' };
+        const rec = reconcile(ab, tol, need, 15);
+
+        // Derive what_set_this
+        const a1Id = drafts['A1'], a2Id = drafts['A2'], a3Id = drafts['A3'];
+        let whatSetThis = 'tolerance';
+        if (rec.binding_constraint === 'ability') {
+          if (ab.band === 'Low') {
+            whatSetThis = ['A1_LT3','A1_3TO5'].includes(a1Id) ? 'ability_horizon' :
+              (a2Id === 'A2_OVER5' && ['A3_NONE','A3_LT3'].includes(a3Id)) ? 'ability_withdrawals' : 'ability_horizon';
+          } else { whatSetThis = 'ability_score'; }
+        } else if (rec.binding_constraint === 'tolerance') {
+          whatSetThis = tol.binding_input === 'rupee anchor' ? 'rupee_anchor' : 'tolerance';
+        }
+
+        preview = {
+          ability_score: ab.score, ability_band: ab.band, ability_ceiling: ab.ceiling_level,
+          tolerance_total: tol.total, tolerance_band: tol.band, tolerance_level: tol.level,
+          anchor_level: tol.anchor_level, literacy_ceiling: null,
+          qualified_level: rec.qualified_level, earned_level: rec.earned_level,
+          advice_level: rec.advice_level, light: rec.light.toLowerCase(),
+          binding_constraint: rec.binding_constraint, what_set_this: whatSetThis,
+        };
+      } else {
+        // Partial: only ability computed
+        preview = {
+          ability_score: ab.score, ability_band: ab.band, ability_ceiling: ab.ceiling_level,
+          partial: true,
+        };
+      }
+    } catch (_) { /* incomplete answers */ }
+  }
+
+  // Also return the confirmed profile if it exists
+  const confirmed = db.latestProfile('demo');
 
   res.json({
     drafts,
     answeredCount: Object.keys(drafts).filter(k => k !== 'STRESS').length,
-    profile: profile || null,
-    composureSeed: composure?.score ?? null,
+    profile: preview || confirmed || null,
+    composureSeed: composure?.score ?? (drafts['STRESS'] ? ({'SELL':35,'HOLD':50,'ADD':65} as any)[drafts['STRESS']] : null),
   });
 });
 
