@@ -5,6 +5,7 @@ import {
   tolerance,
   stressSeedScore,
   reconcile,
+  progressionCheck,
   resolveOptionId,
   getQuestionBank,
   NeedInput,
@@ -421,6 +422,102 @@ export class RiskProfileService {
       emailStatus,
       learnLevel: learnLevel,
       learnGate,
+    };
+  }
+
+  // ---- 8. POST /risk-profile/monthly-check
+  monthlyCheck(investorId: string, input: { nothingChanged: boolean; learnLevel: number; daysAtLevel: number }) {
+    this.guardAdult(investorId);
+    const profile = this.db.latestProfile(investorId);
+    if (!profile) throw new ApiError(404, 'No profile yet');
+
+    // If something changed, the investor must go through the update flow
+    if (!input.nothingChanged) {
+      return { moved: false, action: 'update_required' as const, level: profile.earned_level, reasons: [] };
+    }
+
+    // Re-run ability and tolerance from stored answers to get current engine state
+    const answers = this.db.answersForVersion(investorId, profile.profile_version);
+    const abilityAnswers: Record<string, string> = {};
+    for (const a of answers) {
+      if (a.question_code.startsWith('A')) {
+        const r = resolveOptionId(a.option_id);
+        if (r) abilityAnswers[a.question_code] = r.option;
+      }
+    }
+    const ab = ability(abilityAnswers);
+
+    // Tolerance level from the stored profile (no need to recompute)
+    const tolLevel = profile.tolerance_level;
+
+    // Composure
+    const composure = this.db.findComposureState(investorId);
+    const compScore = composure?.score ?? 50;
+
+    // Days since last confirmed profile
+    const daysSinceConfirmed = Math.floor(
+      (Date.now() - new Date(profile.assessed_on).getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    // Run progression check
+    const prog = progressionCheck(
+      profile.earned_level,
+      ab,
+      tolLevel,
+      input.learnLevel,   // literacy ceiling = the Learn level they've cleared
+      compScore,
+      0,                   // stress events seen — V1 has none
+      input.daysAtLevel,
+      Infinity,            // no adverse event
+      null,                // no deep action
+      null,                // no months since deep
+      daysSinceConfirmed,
+    );
+
+    if (!prog.can_move_up) {
+      return {
+        moved: false,
+        action: 'no_change' as const,
+        level: profile.earned_level,
+        nextLevel: prog.next_level,
+        reasons: prog.reasons,
+      };
+    }
+
+    // Grant one rung: write a new profile row with earned_level + 1
+    const newLevel = profile.earned_level + 1;
+    const newVersion = this.db.nextProfileVersion(investorId);
+    const levels = getLevels();
+    const newLevelRow = levels.find(l => l.level === newLevel)!;
+
+    this.db.insertProfile({
+      ...profile,
+      profile_version: newVersion,
+      assessed_on: new Date().toISOString(),
+      earned_level: newLevel,
+      advice_level: Math.min(newLevel, profile.ability_ceiling),
+      qualified_level: newLevel,
+      engine_version: ENGINE_VERSION,
+      question_bank_version: QUESTION_BANK_VERSION,
+    });
+
+    // Copy answers to the new version
+    for (const a of answers) {
+      this.db.insertAnswer({ ...a, profile_version: newVersion });
+    }
+
+    // Send email for the new profile
+    const inv = this.db.getInvestor(investorId)!;
+    this.sendProfileEmail(investorId, newVersion, inv.email);
+
+    return {
+      moved: true,
+      action: 'promoted' as const,
+      previousLevel: profile.earned_level,
+      newLevel,
+      level: newLevel,
+      largestFall: newLevelRow.worst_fall_rs_per_lakh,
+      reasons: [],
     };
   }
 

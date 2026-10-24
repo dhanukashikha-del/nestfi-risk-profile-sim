@@ -94,6 +94,20 @@ app.get('/api/risk-profile/can-invest', (req, res) => {
   }
 });
 
+app.post('/api/risk-profile/monthly-check', (req, res) => {
+  try {
+    const result = svc.monthlyCheck('demo', {
+      nothingChanged: req.body.nothingChanged ?? true,
+      learnLevel: req.body.learnLevel ?? 0,
+      daysAtLevel: req.body.daysAtLevel ?? 0,
+    });
+    res.json(result);
+  } catch (e) {
+    if (e instanceof ApiError) return res.status(e.status).json({ error: e.message });
+    throw e;
+  }
+});
+
 // ---- Reset for reviewers
 
 app.post('/api/reset', (_req, res) => {

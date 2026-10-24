@@ -567,3 +567,91 @@ describe('GET can-invest', () => {
       .toThrow(expect.objectContaining({ status: 403 }));
   });
 });
+
+// ================================================================ POST /risk-profile/monthly-check
+
+describe('POST monthly-check', () => {
+  test('promotes one level when tolerance qualifies, Learn is done, and 30 days passed', () => {
+    const { db, svc } = freshServiceAndDB();
+    // Arjun: level 7, ability ceiling 9, tolerance level 7.
+    // Monthly check can't promote because tolerance = earned.
+    // Simulate: an investor whose earned is below their qualified level.
+    // This happens when the ratchet granted only one rung in a previous update.
+    submitAndConfirm(svc, db, 'mc1', PERSONA_ANSWERS.arjun.answers, 'HOLD');
+    expect(db.latestProfile('mc1')!.earned_level).toBe(7);
+
+    // Manually set earned_level to 5 to simulate the ratchet having granted
+    // only one rung previously (investor qualifies for 7 but is at 5).
+    (db.latestProfile('mc1')! as any).earned_level = 5;
+    (db.latestProfile('mc1')! as any).tolerance_level = 7;
+
+    // Monthly check: learn cleared to 10, 45 days at level → should promote 5 → 6
+    const result = svc.monthlyCheck('mc1', { nothingChanged: true, learnLevel: 10, daysAtLevel: 45 });
+    expect(result.moved).toBe(true);
+    expect(result.newLevel).toBe(6);
+    expect(result.previousLevel).toBe(5);
+    const after = db.latestProfile('mc1')!;
+    expect(after.earned_level).toBe(6);
+  });
+
+  test('does not promote when Learn is not done for next level', () => {
+    const { db, svc } = freshServiceAndDB();
+    submitAndConfirm(svc, db, 'mc2', PERSONA_ANSWERS.arjun.answers, 'HOLD');
+    // Learn only cleared to level 7 (current), not 8
+    const result = svc.monthlyCheck('mc2', { nothingChanged: true, learnLevel: 7, daysAtLevel: 45 });
+    expect(result.moved).toBe(false);
+    expect(result.reasons).toContain('Module for the next level not completed');
+  });
+
+  test('does not promote before 30 days', () => {
+    const { db, svc } = freshServiceAndDB();
+    submitAndConfirm(svc, db, 'mc3', PERSONA_ANSWERS.arjun.answers, 'HOLD');
+    const result = svc.monthlyCheck('mc3', { nothingChanged: true, learnLevel: 10, daysAtLevel: 15 });
+    expect(result.moved).toBe(false);
+    expect(result.reasons).toContain('Minimum stay of 30 days not served');
+  });
+
+  test('does not promote past ability ceiling', () => {
+    const { db, svc } = freshServiceAndDB();
+    // Suresh: level 4, ability ceiling 12 — no problem there.
+    // Ramesh: level 5, ability ceiling 5 — already at ceiling.
+    submitAndConfirm(svc, db, 'mc4', PERSONA_ANSWERS.ramesh.answers, 'ADD');
+    const result = svc.monthlyCheck('mc4', { nothingChanged: true, learnLevel: 15, daysAtLevel: 60 });
+    expect(result.moved).toBe(false);
+    expect(result.reasons).toContain('Ability ceiling');
+  });
+
+  test('does not promote at level 15', () => {
+    const { db, svc } = freshServiceAndDB();
+    // Directly set up an investor at level 15 by manipulating the DB
+    submitAndConfirm(svc, db, 'mc5', PERSONA_ANSWERS.priya.answers, 'ADD');
+    // Manually set earned_level to 15 for this test
+    const profile = db.latestProfile('mc5')!;
+    (profile as any).earned_level = 15;
+    const result = svc.monthlyCheck('mc5', { nothingChanged: true, learnLevel: 15, daysAtLevel: 45 });
+    expect(result.moved).toBe(false);
+    expect(result.reasons).toContain('Already at the top of the ladder');
+  });
+
+  test('nothingChanged false triggers update flow instead', () => {
+    const { db, svc } = freshServiceAndDB();
+    submitAndConfirm(svc, db, 'mc6', PERSONA_ANSWERS.arjun.answers, 'HOLD');
+    const result = svc.monthlyCheck('mc6', { nothingChanged: false, learnLevel: 10, daysAtLevel: 45 });
+    expect(result.moved).toBe(false);
+    expect(result.action).toBe('update_required');
+  });
+
+  test('404 when no profile exists', () => {
+    const { db, svc } = freshServiceAndDB();
+    db.addInvestor('mc7', 'm@example.com', false);
+    expect(() => svc.monthlyCheck('mc7', { nothingChanged: true, learnLevel: 5, daysAtLevel: 30 }))
+      .toThrow(expect.objectContaining({ status: 404 }));
+  });
+
+  test('403 for child account', () => {
+    const { db, svc } = freshServiceAndDB();
+    db.addInvestor('mc8', 'm@example.com', true);
+    expect(() => svc.monthlyCheck('mc8', { nothingChanged: true, learnLevel: 5, daysAtLevel: 30 }))
+      .toThrow(expect.objectContaining({ status: 403 }));
+  });
+});
