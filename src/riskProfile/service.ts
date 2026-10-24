@@ -270,6 +270,12 @@ export class RiskProfileService {
     const fallPercent = anchorLossPct;
     const fallRupees = 100000 - fallPercent * 1000;
 
+    // For updates (version > 1), include the previous level so the result
+    // screen can show "Was Level N"
+    const previousProfile = version > 1
+      ? this.db.profileForVersion(investorId, version - 1)
+      : null;
+
     return {
       profileVersion: version,
       engineVersion: ENGINE_VERSION,
@@ -296,6 +302,10 @@ export class RiskProfileService {
       },
       whatSetThis,
       email: { to: this.maskEmail(inv.email), status: emailStatus },
+      ...(previousProfile ? {
+        previousLevel: previousProfile.earned_level,
+        previousBand: bandFromLevel(previousProfile.earned_level),
+      } : {}),
     };
   }
 
@@ -358,6 +368,59 @@ export class RiskProfileService {
       email: emailLog ? { to: this.maskEmail(inv.email), status: emailLog.status } : undefined,
       reviewDueOn: reviewDueOn.toISOString().slice(0, 10),
       ...(answeredSoFar !== undefined ? { answeredSoFar } : {}),
+    };
+  }
+
+  // ---- 6. POST /risk-profile/update
+  startUpdate(investorId: string) {
+    const inv = this.guardAdult(investorId);
+    const profile = this.db.latestProfile(investorId);
+    if (!profile) throw new ApiError(404, 'No confirmed profile to update');
+    if (inv.draft_answers.size > 0) throw new ApiError(409, 'An update draft already exists');
+
+    // Copy all answers from the last confirmed version into drafts
+    const prevAnswers = this.db.answersForVersion(investorId, profile.profile_version);
+    for (const a of prevAnswers) {
+      inv.draft_answers.set(a.question_code, { option_id: a.option_id, answered_at: a.answered_at });
+    }
+
+    const prefilled: Record<string, string> = {};
+    for (const [k, v] of inv.draft_answers.entries()) prefilled[k] = v.option_id;
+
+    return {
+      profileVersion: profile.profile_version + 1,
+      previousVersion: profile.profile_version,
+      previousLevel: profile.earned_level,
+      previousBand: bandFromLevel(profile.earned_level),
+      prefilled,
+    };
+  }
+
+  // ---- 7. GET /risk-profile/can-invest
+  canInvest(investorId: string, learnLevel: number | null = null) {
+    this.guardAdult(investorId);
+    const profile = this.db.latestProfile(investorId);
+    if (!profile) throw new ApiError(404, 'No profile yet');
+    const emailLog = this.db.findEmailLog(investorId, profile.profile_version);
+    const emailStatus = emailLog?.status ?? 'not_sent';
+    const canInvest = emailStatus === 'sent';
+
+    let learnGate = null;
+    if (learnLevel != null && learnLevel > profile.earned_level) {
+      learnGate = {
+        finishedLearnLevel: learnLevel,
+        profileLevel: profile.earned_level,
+        message: `Based on your risk profile, Level ${profile.earned_level} suits you best.`,
+      };
+    }
+
+    return {
+      canInvest,
+      level: profile.earned_level,
+      earnedLevel: profile.earned_level,
+      emailStatus,
+      learnLevel: learnLevel,
+      learnGate,
     };
   }
 

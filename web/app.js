@@ -106,14 +106,22 @@ function render() {
   switch (currentScreen) {
     case 'doorway': phone.innerHTML = renderDoorway(); break;
     case 'intro': phone.innerHTML = renderIntro(); break;
+    case 'why': phone.innerHTML = renderWhySheet(); break;
     case 'question': phone.innerHTML = renderQuestion(); break;
     case 'stress': phone.innerHTML = renderStress(); break;
     case 'rupee': phone.innerHTML = renderRupee(); break;
     case 'confirm': phone.innerHTML = renderConfirm(); break;
+    case 'saving': phone.innerHTML = renderSaving(); break;
     case 'change': phone.innerHTML = renderChangeAnswers(); break;
     case 'confirmed': phone.innerHTML = renderConfirmed(); break;
     case 'result': phone.innerHTML = renderResult(); break;
     case 'email_failed': phone.innerHTML = renderEmailFailed(); break;
+    case 'learn_gate': phone.innerHTML = renderLearnGate(); break;
+    case 'my_profile': phone.innerHTML = renderMyProfile(); break;
+    case 'update_sheet': phone.innerHTML = renderUpdateSheet(); break;
+    case 'answers_edit': phone.innerHTML = renderAnswersEdit(); break;
+    case 'confirm_update': phone.innerHTML = renderConfirmUpdate(); break;
+    case 'result_updated': phone.innerHTML = renderResultUpdated(); break;
     default: phone.innerHTML = renderDoorway();
   }
   updateWorkings();
@@ -155,11 +163,27 @@ function renderIntro() {
     <div class="screen">
       <button class="back-btn" onclick="goScreen('doorway')">&#8249;</button>
       <div class="intro-illustration"><img src="seesaw.svg" alt="Balance illustration"></div>
-      <div style="font-size:28px;font-weight:700;line-height:1.2;margin-bottom:12px">Find your balance between safe and growth</div>
-      <div class="sub-text">14 questions, 3 minutes. Your answers decide which levels you can invest in.</div>
+      <div style="font-size:30px;font-weight:700;line-height:1.15;margin-bottom:12px">Find your balance between safe and growth</div>
+      <div class="sub-text">3 minutes. Your answers decide which levels you can invest in.</div>
       <div class="btn-bottom">
         <button class="btn-primary" onclick="startQuestions()">Start</button>
-        <div class="intro-notice">Used only to assess what suits you. Kept 5 years, as SEBI requires.</div>
+        <div class="intro-notice">Your answers stay private. <a href="#" onclick="event.preventDefault();goScreen('why')" style="color:var(--brand-purple);font-weight:600;text-decoration:underline">Why a risk profile?</a></div>
+      </div>
+    </div>`;
+}
+
+function renderWhySheet() {
+  return `
+    <div style="flex:1;background:rgba(0,14,38,0.45);display:flex;flex-direction:column;justify-content:flex-end">
+      <div class="bottom-sheet" style="border-radius:20px 20px 0 0;padding:12px 20px 32px;display:flex;flex-direction:column;gap:20px">
+        <div class="sheet-handle"></div>
+        <div style="font-size:22px;font-weight:600;line-height:1.3">Why a risk profile?</div>
+        <div style="display:flex;flex-direction:column;gap:14px;font-size:16px;line-height:1.5">
+          <div style="display:flex;gap:12px"><span style="color:var(--brand-purple);font-weight:600">1</span><span>It tells us how much of a fall you can afford, and how much you can sit through.</span></div>
+          <div style="display:flex;gap:12px"><span style="color:var(--brand-purple);font-weight:600">2</span><span>That sets the levels you can invest in. Higher levels open as your situation and record change.</span></div>
+          <div style="display:flex;gap:12px"><span style="color:var(--brand-purple);font-weight:600">3</span><span>Every investor completes one before any investment is suggested. Your answers are kept 5 years and never shared or sold.</span></div>
+        </div>
+        <button class="btn-primary" onclick="goScreen('intro')">Got it</button>
       </div>
     </div>`;
 }
@@ -293,6 +317,32 @@ function renderConfirm() {
     </div>`;
 }
 
+// ---------------------------------------------------------------- screen: saving (10b)
+
+function renderSaving() {
+  const anchor = anchorData();
+  const w = lastWorkings;
+  const previewAbsorb = (w && w.profile) ? w.profile.ability_band : '—';
+  const previewApproach = (w && w.profile) ? approachLabel(w.profile.tolerance_band) : '—';
+  return `
+    <div class="screen">
+      <div style="height:40px"></div>
+      <div style="font-size:28px;font-weight:600;line-height:1.2;margin-bottom:8px">Your profile</div>
+      <div class="summary-card">
+        <div class="summary-row"><div class="label" style="font-size:13px">What your household can absorb</div><div class="value" style="font-size:18px">${previewAbsorb}</div></div>
+        <div class="summary-row"><div class="label" style="font-size:13px">How you approach risk</div><div class="value" style="font-size:18px">${previewApproach}</div></div>
+        <div class="summary-row"><div class="label" style="font-size:13px">Investing experience</div><div class="value" style="font-size:18px">${experienceLabel()}</div></div>
+        <div class="summary-row highlighted"><div class="label" style="font-size:13px">The fall you'd sit through</div><div class="value" style="font-size:18px">${anchor.pct}%, Rs ${anchor.rs} on a lakh</div></div>
+      </div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">A copy goes to demo@nestfi.in.</div>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;height:48px;border-radius:8px;background:var(--brand-purple);color:white;font-size:16px;font-weight:600">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="white" stroke-opacity="0.35" stroke-width="2.5"/><path d="M21 12a9 9 0 0 0-9-9" stroke="white" stroke-width="2.5" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.9s" repeatCount="indefinite"/></path></svg>
+        Saving your profile
+      </div>
+    </div>`;
+}
+
 // ---------------------------------------------------------------- screen: change answers (11)
 
 function renderChangeAnswers() {
@@ -325,9 +375,11 @@ function renderChangeAnswers() {
 function renderConfirmed() {
   return `
     <div class="screen center-screen">
-      <div class="center-icon" style="background:var(--success-bg);color:var(--success)">&#10003;</div>
-      <div class="center-title">Profile confirmed</div>
-      <div class="center-sub">Copy sent to demo@nestfi.in</div>
+      <img src="envelope.svg" alt="Envelope" style="width:300px;height:200px;object-fit:contain">
+      <div style="display:flex;flex-direction:column;gap:8px;text-align:center">
+        <div style="font-size:26px;font-weight:600;line-height:1.2">Profile confirmed</div>
+        <div style="font-size:16px;color:var(--text-secondary);line-height:1.5">A copy is in your inbox, demo@nestfi.in</div>
+      </div>
       <div class="btn-bottom" style="width:100%"><button class="btn-primary" onclick="currentScreen='result';render()">See my result</button></div>
     </div>`;
 }
@@ -339,45 +391,35 @@ function renderResult() {
   if (!r) return '<div class="screen">No result yet.</div>';
   const level = r.level;
   const bandLabel = level <= 5 ? 'Low' : level <= 10 ? 'Moderate' : 'High';
-  const bandDesc = {
-    Low: 'Keeping your money safe matters more than growing it fast.',
-    Moderate: 'Some ups and downs for better growth, within limits.',
-    High: 'Comfortable with big swings for the chance of more growth.'
-  }[bandLabel];
   const showWhatSet = r.whatSetThis === 'ability_horizon' || r.whatSetThis === 'ability_withdrawals';
-  const whatSetText = r.whatSetThis === 'ability_horizon' ? 'You need this money within 5 years.' : 'You plan to withdraw more than 5% a year.';
-  const notYetText = level >= 15 ? null : level >= 11 ? `Level ${level+1} and above` : `Level ${level+1} and above. Your own stock picks, from Level 11`;
+  const whatSetText = r.whatSetThis === 'ability_horizon' ? 'Money needed within 5 years' : 'Withdrawals over 5% a year';
+  const notYetText = level >= 15 ? null : `Level ${level+1} and above`;
   const fall = r.largestFall.rupeesPerLakh.toLocaleString('en-IN');
-
-  let levelSegs = '';
-  for (let i = 1; i <= 15; i++) {
-    const filled = i <= level;
-    const opacity = filled ? (0.4 + 0.6 * i / level) : 1;
-    const color = filled ? `rgba(106,87,227,${opacity})` : 'var(--border-subtle)';
-    levelSegs += `<div class="level-seg" style="background:${color}"></div>`;
-  }
+  const tickIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="11" fill="#CFFCE4"/><path d="M7 12.5l3 3 7-7" stroke="#009466" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const dashIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="10" stroke="#98A2B3" stroke-width="2" stroke-dasharray="3 3"/></svg>`;
+  const fallIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><path d="M4 8l6 6 4-4 6 6" stroke="#B03C00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 11v5h-5" stroke="#B03C00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const whatIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="10" stroke="#6A57E3" stroke-width="2"/><path d="M12 8v4M12 16h.01" stroke="#6A57E3" stroke-width="2" stroke-linecap="round"/></svg>`;
 
   return `
-    <div class="screen" style="padding-top:40px">
-      <div class="section-label">Your risk profile</div>
-      <div style="font-size:36px;font-weight:700;margin-bottom:8px">Level ${level}</div>
-      <div class="sub-text">${bandLabel}. ${bandDesc}</div>
-      <div class="level-strip">${levelSegs}</div>
-      <div class="video-card">
-        <div class="video-icon">&#9654;</div>
-        <div><div class="video-title">What Level ${level} means for you</div><div class="video-dur">1 min</div></div>
+    <div class="screen" style="gap:16px">
+      <div style="display:flex;align-items:center;justify-content:center;height:160px"><img src="level_block.svg" style="width:252px;height:160px;object-fit:contain" alt="Level ${level}"></div>
+      <div style="display:flex;flex-direction:column;gap:6px;text-align:center">
+        <span style="font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--brand-purple)">Your risk profile</span>
+        <div style="font-size:32px;font-weight:600;line-height:1.15">Level ${level}</div>
+        <div style="font-size:16px;color:var(--text-secondary)">${bandLabel}</div>
       </div>
+      <a href="#" onclick="event.preventDefault()" class="video-card" style="background:#F1EFFC;text-decoration:none;color:var(--text-primary)">
+        <span class="video-icon">&#9654;</span>
+        <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:16px;font-weight:600">What Level ${level} means</span><span style="font-size:13px;color:var(--text-secondary)">1 min</span></span>
+      </a>
       <div class="info-card">
-        <div class="info-row"><div class="label">Open to you</div><div class="value">Mixes for Levels 1 to ${level}</div></div>
-        ${showWhatSet ? `<div class="info-row"><div class="label">What set this</div><div class="value">${whatSetText}</div></div>` : ''}
-        ${!showWhatSet && notYetText ? `<div class="info-row"><div class="label">Not yet</div><div class="value">${notYetText}</div></div>` : ''}
-        <div class="info-row"><div class="label">Largest fall at Level ${level}, ${r.largestFall.period}</div><div class="value">Rs ${fall} on a lakh</div></div>
+        <div class="info-row" style="display:flex;align-items:center;gap:12px">${tickIcon}<span style="display:flex;flex-direction:column;gap:2px"><span class="label" style="font-size:13px">Open to you</span><span class="value" style="font-size:16px">Levels 1 to ${level}</span></span></div>
+        ${notYetText ? `<div class="info-row" style="display:flex;align-items:center;gap:12px">${dashIcon}<span style="display:flex;flex-direction:column;gap:2px"><span class="label" style="font-size:13px">Not yet</span><span class="value" style="font-size:16px">${notYetText}</span></span></div>` : ''}
+        <div class="info-row" style="display:flex;align-items:center;gap:12px">${fallIcon}<span style="display:flex;flex-direction:column;gap:2px"><span class="label" style="font-size:13px">Largest fall, Level ${level}</span><span class="value" style="font-size:16px;font-variant-numeric:tabular-nums">Rs ${fall} on a lakh</span></span></div>
+        ${showWhatSet ? `<div class="info-row" style="display:flex;align-items:center;gap:12px">${whatIcon}<span style="display:flex;flex-direction:column;gap:2px"><span class="label" style="font-size:13px">What set this</span><span class="value" style="font-size:16px">${whatSetText}</span></span></div>` : ''}
       </div>
-      <div style="font-size:14px;color:var(--text-secondary);line-height:1.4;margin-bottom:16px">Levels open as your circumstances, learning and investing record change.</div>
-      <div class="btn-bottom">
-        <button class="btn-primary" onclick="goScreen('doorway')">Continue to agreement</button>
-        <button class="btn-secondary" style="margin-top:8px" onclick="returnToResult=true;currentScreen='change';render()">Change an answer</button>
-      </div>
+      <div style="flex:1"></div>
+      <button class="btn-primary" onclick="goScreen('doorway')">Continue to agreement</button>
     </div>`;
 }
 
@@ -507,6 +549,8 @@ async function selectRupee(id) {
 function goConfirm() { currentScreen = 'confirm'; updateWorkings(); render(); }
 
 async function doConfirm() {
+  currentScreen = 'saving';
+  render();
   const status = await apiConfirm();
   if (status === 'ok') { currentScreen = 'confirmed'; }
   else if (status === 'email_failed') { currentScreen = 'email_failed'; }
@@ -526,6 +570,209 @@ function jumpToQuestion(idx) {
   else if (code === 'R1') currentScreen = 'rupee';
   else currentScreen = 'question';
   render();
+}
+
+// ---------------------------------------------------------------- screen: learn gate (S18)
+
+function renderLearnGate() {
+  const learnLvl = window._simLearnLevel || 8;
+  const profileLvl = confirmedResult ? confirmedResult.level : 5;
+  return `
+    <div class="screen">
+      <button class="back-btn" onclick="goScreen('my_profile')">&#8249;</button>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;justify-content:center;height:160px"><img src="level_block.svg" style="width:252px;height:160px;object-fit:contain"></div>
+      <div style="display:flex;flex-direction:column;gap:10px;text-align:center">
+        <div style="font-size:28px;font-weight:600;line-height:1.2">You've finished Level ${learnLvl}</div>
+        <div style="font-size:16px;color:var(--text-secondary);line-height:1.5">Based on your risk profile, Level ${profileLvl} suits you best.</div>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn-primary" onclick="goScreen('doorway')">Keep learning</button>
+        <button class="btn-secondary" onclick="goScreen('result')">See my risk profile</button>
+      </div>
+    </div>`;
+}
+
+// ---------------------------------------------------------------- screen: my risk profile (S19)
+
+function renderMyProfile() {
+  const r = confirmedResult;
+  if (!r) return '<div class="screen"><div>No profile yet.</div></div>';
+  const level = r.level;
+  const bandLabel = level <= 5 ? 'Low' : level <= 10 ? 'Moderate' : 'High';
+  const fall = r.largestFall.rupeesPerLakh.toLocaleString('en-IN');
+  const notYetText = level >= 15 ? null : `Level ${level+1} and above`;
+  const tickIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="11" fill="#CFFCE4"/><path d="M7 12.5l3 3 7-7" stroke="#009466" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const dashIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="10" stroke="#98A2B3" stroke-width="2" stroke-dasharray="3 3"/></svg>`;
+  const fallIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><path d="M4 8l6 6 4-4 6 6" stroke="#B03C00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 11v5h-5" stroke="#B03C00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  return `
+    <div class="screen" style="gap:16px">
+      <button class="back-btn" onclick="goScreen('doorway')">&#8249;</button>
+      <div style="display:flex;align-items:center;justify-content:center;height:120px"><img src="level_block.svg" style="width:189px;height:120px;object-fit:contain"></div>
+      <div style="display:flex;flex-direction:column;gap:6px;text-align:center">
+        <span style="font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--brand-purple)">Your risk profile</span>
+        <div style="font-size:32px;font-weight:600;line-height:1.15">Level ${level}</div>
+        <div style="font-size:16px;color:var(--text-secondary)">${bandLabel}</div>
+      </div>
+      <div class="info-card">
+        <div class="info-row" style="display:flex;align-items:center;gap:12px">${tickIcon}<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Open to you</span><span style="font-size:16px;font-weight:600">Levels 1 to ${level}</span></span></div>
+        ${notYetText ? `<div class="info-row" style="display:flex;align-items:center;gap:12px">${dashIcon}<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Not yet</span><span style="font-size:16px;font-weight:600">${notYetText}</span></span></div>` : ''}
+        <div class="info-row" style="display:flex;align-items:center;gap:12px">${fallIcon}<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Largest fall, Level ${level}</span><span style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">Rs ${fall} on a lakh</span></span></div>
+      </div>
+      <div style="font-size:13px;color:var(--text-secondary);text-align:center">Assessed 24 Oct 2026. Next review by 24 Oct 2027.</div>
+      <div style="flex:1"></div>
+      <button class="btn-primary" onclick="startUpdateFlow()">Update my answers</button>
+    </div>`;
+}
+
+// ---------------------------------------------------------------- screen: update sheet (S20)
+
+function renderUpdateSheet() {
+  return `
+    <div style="flex:1;background:rgba(0,14,38,0.45);display:flex;flex-direction:column;justify-content:flex-end">
+      <div class="bottom-sheet" style="border-radius:20px 20px 0 0;padding:12px 20px 32px;display:flex;flex-direction:column;gap:20px">
+        <div class="sheet-handle"></div>
+        <div style="font-size:22px;font-weight:600;line-height:1.3">Update your answers?</div>
+        <div style="font-size:16px;color:var(--text-secondary);line-height:1.5">New job, loan paid off, goal moved? Go through your answers and change what's different. A new copy goes to your email.</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button class="btn-primary" onclick="goScreen('answers_edit')">Review my answers</button>
+          <button class="btn-secondary" onclick="goScreen('my_profile')">Not now</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ---------------------------------------------------------------- screen: answers edit for update (S21)
+
+function renderAnswersEdit() {
+  const updateCodes = ['A1','A2','A3','A4','A5','A6','A7','A8','T1','T2','T4','T5'];
+  const shortLabels = {
+    A1:"When you'll use most of it", A2:'Withdrawals in the next 3 years', A3:'Months of expenses set aside',
+    A4:'Household income', A5:'Income going to loans', A6:'People who depend on you',
+    A7:'Share of family investments', A8:'Health and term cover',
+    T1:'Willing to take risk', T2:'Safety or return', T4:'Years investing', T5:'How risky is the market',
+  };
+  let html = `<div class="screen" style="gap:20px;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:12px;height:40px">
+      <button class="back-btn" onclick="goScreen('confirm_update')">&#8249;</button>
+      <div style="font-size:20px;font-weight:600">Your answers</div>
+    </div>
+    <div style="display:flex;flex-direction:column;overflow-y:auto;min-height:0;flex:1">`;
+  let lastSection = '';
+  for (const code of updateCodes) {
+    const section = code.startsWith('A') ? 'Your household' : 'You as an investor';
+    if (section !== lastSection) {
+      html += `<span style="font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--brand-purple);padding:${lastSection?'20':'8'}px 0 8px">${section}</span>`;
+      lastSection = section;
+    }
+    const q = getQuestion(code);
+    const optId = answers[code];
+    const opt = q ? q.options.find(o => o.id === optId) : null;
+    html += `<a href="#" onclick="event.preventDefault();jumpToQuestion(${flowOrder.indexOf(code)})" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-top:1px solid var(--border-subtle);text-decoration:none;color:var(--text-primary)">
+      <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:13px;color:var(--text-secondary)">${shortLabels[code]||code}</span><span style="font-size:16px">${opt?opt.label:'—'}</span></span>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="#98A2B3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>`;
+  }
+  html += `</div>
+    <button class="btn-primary" onclick="goScreen('confirm_update')" style="position:sticky;bottom:0;box-shadow:0 -8px 16px white">These are up to date</button>
+  </div>`;
+  return html;
+}
+
+// ---------------------------------------------------------------- screen: confirm update (S22)
+
+function renderConfirmUpdate() {
+  const w = lastWorkings;
+  const p = w && w.profile ? w.profile : null;
+  const prev = confirmedResult;
+  const anchor = anchorData();
+  const prevAnchor = prev ? { pct: prev.summary.fallHeldThrough.percent } : { pct: 0 };
+  const absorb = p ? p.ability_band : '—';
+  const prevAbsorb = prev ? prev.summary.absorb : '';
+  const approach = p ? approachLabel(p.tolerance_band) : '—';
+  const prevApproach = prev ? prev.summary.approach : '';
+  const exp = experienceLabel();
+
+  function wasLabel(curr, prev) { return curr !== prev && prev ? ` <span style="font-size:13px;font-weight:400;color:var(--text-secondary)">was ${prev}</span>` : ''; }
+
+  return `
+    <div class="screen">
+      <button class="back-btn" onclick="goScreen('answers_edit')">&#8249;</button>
+      <div style="font-size:28px;font-weight:600;line-height:1.2;margin:8px 0 24px">Your updated profile</div>
+      <div class="summary-card">
+        <div class="summary-row"><div class="label" style="font-size:13px">What your household can absorb</div><div class="value" style="font-size:18px">${absorb}${wasLabel(absorb,prevAbsorb)}</div></div>
+        <div class="summary-row"><div class="label" style="font-size:13px">How you approach risk</div><div class="value" style="font-size:18px">${approach}${wasLabel(approach,prevApproach)}</div></div>
+        <div class="summary-row"><div class="label" style="font-size:13px">Investing experience</div><div class="value" style="font-size:18px">${exp}</div></div>
+        <div class="summary-row highlighted"><div class="label" style="font-size:13px">The fall you'd sit through</div><div class="value" style="font-size:18px">${anchor.pct}%, Rs ${anchor.rs} on a lakh${anchor.pct !== prevAnchor.pct ? ` <span style="font-size:13px;font-weight:400;color:var(--text-secondary)">was ${prevAnchor.pct}%</span>` : ''}</div></div>
+      </div>
+      <div style="font-size:13px;color:var(--text-secondary)">A copy goes to demo@nestfi.in.</div>
+      <div style="flex:1"></div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn-primary" onclick="doConfirmUpdate()">These are right</button>
+        <button class="btn-secondary" onclick="goScreen('answers_edit')">Back to answers</button>
+      </div>
+    </div>`;
+}
+
+// ---------------------------------------------------------------- screen: result updated (S23)
+
+function renderResultUpdated() {
+  const r = confirmedResult;
+  if (!r) return '<div class="screen">No result.</div>';
+  const level = r.level;
+  const prevLevel = r.previousLevel || level;
+  const bandLabel = level <= 5 ? 'Low' : level <= 10 ? 'Moderate' : 'High';
+  const fall = r.largestFall.rupeesPerLakh.toLocaleString('en-IN');
+  const notYetText = level >= 15 ? null : `Level ${level+1} and above`;
+  const tickIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="11" fill="#CFFCE4"/><path d="M7 12.5l3 3 7-7" stroke="#009466" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const dashIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="10" stroke="#98A2B3" stroke-width="2" stroke-dasharray="3 3"/></svg>`;
+  const fallIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><path d="M4 8l6 6 4-4 6 6" stroke="#B03C00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 11v5h-5" stroke="#B03C00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  return `
+    <div class="screen" style="gap:16px">
+      <div style="display:flex;align-items:center;justify-content:center;height:160px"><img src="level_block.svg" style="width:252px;height:160px;object-fit:contain"></div>
+      <div style="display:flex;flex-direction:column;gap:6px;text-align:center">
+        <span style="font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--brand-purple)">Your risk profile</span>
+        <div style="font-size:32px;font-weight:600;line-height:1.15">Level ${level}</div>
+        <div style="font-size:16px;color:var(--text-secondary)">${bandLabel}${level !== prevLevel ? `. Was Level ${prevLevel}.` : ''}</div>
+      </div>
+      <a href="#" onclick="event.preventDefault()" class="video-card" style="background:#F1EFFC;text-decoration:none;color:var(--text-primary)">
+        <span class="video-icon">&#9654;</span>
+        <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:16px;font-weight:600">What Level ${level} means</span><span style="font-size:13px;color:var(--text-secondary)">1 min</span></span>
+      </a>
+      <div class="info-card">
+        <div class="info-row" style="display:flex;align-items:center;gap:12px">${tickIcon}<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Open to you</span><span style="font-size:16px;font-weight:600">Levels 1 to ${level}</span></span></div>
+        ${notYetText ? `<div class="info-row" style="display:flex;align-items:center;gap:12px">${dashIcon}<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Not yet</span><span style="font-size:16px;font-weight:600">${notYetText}</span></span></div>` : ''}
+        <div class="info-row" style="display:flex;align-items:center;gap:12px">${fallIcon}<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Largest fall, Level ${level}</span><span style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">Rs ${fall} on a lakh</span></span></div>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn-primary" onclick="goScreen('my_profile')">Done</button>
+    </div>`;
+}
+
+// ---------------------------------------------------------------- update flow helpers
+
+async function startUpdateFlow() {
+  try {
+    const res = await fetch(`${API}/risk-profile/update`, { method: 'POST' });
+    if (!res.ok) { goScreen('update_sheet'); return; }
+    const data = await res.json();
+    // Prefill answers from the update response
+    for (const [code, optId] of Object.entries(data.prefilled)) {
+      if (code === 'STRESS') stressAnswer = optId;
+      else answers[code] = optId;
+    }
+    goScreen('update_sheet');
+  } catch { goScreen('update_sheet'); }
+}
+
+async function doConfirmUpdate() {
+  currentScreen = 'saving';
+  render();
+  const status = await apiConfirm();
+  if (status === 'ok') { currentScreen = 'result_updated'; }
+  else if (status === 'email_failed') { currentScreen = 'email_failed'; }
+  render();
+  await updateWorkings();
 }
 
 // ---------------------------------------------------------------- dev bar
@@ -567,6 +814,12 @@ async function loadPersona(name) {
   await updateWorkings();
   render();
   document.getElementById('persona-select').value = '';
+}
+
+function triggerLearnGate() {
+  if (!confirmedResult) { alert('Confirm a profile first'); return; }
+  window._simLearnLevel = confirmedResult.level + 3; // simulate finishing a higher Learn level
+  goScreen('learn_gate');
 }
 
 async function resetAll() {

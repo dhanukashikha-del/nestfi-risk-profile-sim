@@ -66,6 +66,7 @@ export interface IRiskProfileStore {
   insertAnswer(row: InvestorAnswerRow): void;
   insertEmailLog(row: ProfileEmailLogRow): void;
   findEmailLog(investorId: string, version: number): ProfileEmailLogRow | undefined;
+  profileForVersion(investorId: string, version: number): InvestorProfileRow | undefined;
   findComposureState(investorId: string): ComposureStateRow | undefined;
   upsertComposureState(row: ComposureStateRow): void;
 }
@@ -121,6 +122,12 @@ export class RiskProfileDB implements IRiskProfileStore {
 
   findEmailLog(investorId: string, version: number): ProfileEmailLogRow | undefined {
     return this.profile_email_log.find(
+      r => r.investor_id === investorId && r.profile_version === version,
+    );
+  }
+
+  profileForVersion(investorId: string, version: number): InvestorProfileRow | undefined {
+    return this.investor_profiles.find(
       r => r.investor_id === investorId && r.profile_version === version,
     );
   }

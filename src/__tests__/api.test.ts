@@ -478,3 +478,92 @@ describe('POST resend email', () => {
       .toThrow(expect.objectContaining({ status: 404 }));
   });
 });
+
+// ================================================================ POST /risk-profile/update
+
+describe('POST start update', () => {
+  test('creates draft v2 prefilled from confirmed profile', () => {
+    const { db, svc } = freshServiceAndDB();
+    submitAndConfirm(svc, db, 'upd1', PERSONA_ANSWERS.arjun.answers, 'HOLD');
+    const result = svc.startUpdate('upd1');
+    expect(result.profileVersion).toBe(2);
+    expect(result.previousVersion).toBe(1);
+    expect(result.previousLevel).toBe(7); // Arjun first-time level
+    expect(result.prefilled['A1']).toBe('A1_10PLUS');
+    expect(result.prefilled['STRESS']).toBe('HOLD');
+    expect(result.prefilled['R1']).toBe('R1_RS_79_000_A_FALL_OF_21');
+  });
+
+  test('404 when no profile exists', () => {
+    const { db, svc } = freshServiceAndDB();
+    db.addInvestor('upd2', 'u@example.com', false);
+    expect(() => svc.startUpdate('upd2'))
+      .toThrow(expect.objectContaining({ status: 404 }));
+  });
+
+  test('409 when an update draft already exists', () => {
+    const { db, svc } = freshServiceAndDB();
+    submitAndConfirm(svc, db, 'upd3', PERSONA_ANSWERS.arjun.answers, 'HOLD');
+    svc.startUpdate('upd3');
+    expect(() => svc.startUpdate('upd3'))
+      .toThrow(expect.objectContaining({ status: 409 }));
+  });
+
+  test('changing an answer and confirming shows previousLevel', () => {
+    const { db, svc } = freshServiceAndDB();
+    submitAndConfirm(svc, db, 'upd4', PERSONA_ANSWERS.arjun.answers, 'HOLD');
+    svc.startUpdate('upd4');
+    // Change A1 to 10+ years (was already, but save to mark as active)
+    svc.saveAnswer('upd4', 'A3', 'A3_6PLUS', '2026-10-24T10:00:00Z');
+    const result = svc.confirm('upd4');
+    expect(result.profileVersion).toBe(2);
+    expect(result.previousLevel).toBe(7);
+    expect(result.previousBand).toBe('moderate');
+  });
+});
+
+// ================================================================ GET /risk-profile/can-invest
+
+describe('GET can-invest', () => {
+  test('returns canInvest true after confirmed profile with email sent', () => {
+    const { db, svc } = freshServiceAndDB();
+    submitAndConfirm(svc, db, 'ci1', PERSONA_ANSWERS.arjun.answers, 'HOLD');
+    const result = svc.canInvest('ci1');
+    expect(result.canInvest).toBe(true);
+    expect(result.level).toBe(7);
+    expect(result.emailStatus).toBe('sent');
+    expect(result.learnGate).toBeNull();
+  });
+
+  test('404 when no profile exists', () => {
+    const { db, svc } = freshServiceAndDB();
+    db.addInvestor('ci2', 'c@example.com', false);
+    expect(() => svc.canInvest('ci2'))
+      .toThrow(expect.objectContaining({ status: 404 }));
+  });
+
+  test('returns learnGate when learn level exceeds profile level', () => {
+    const { db, svc } = freshServiceAndDB();
+    submitAndConfirm(svc, db, 'ci3', PERSONA_ANSWERS.ramesh.answers, 'ADD');
+    // Ramesh first-time level is 5, simulate finishing Learn level 8
+    const result = svc.canInvest('ci3', 8);
+    expect(result.canInvest).toBe(true);
+    expect(result.learnGate).not.toBeNull();
+    expect(result.learnGate!.finishedLearnLevel).toBe(8);
+    expect(result.learnGate!.profileLevel).toBe(5);
+  });
+
+  test('no learnGate when learn level is at or below profile level', () => {
+    const { db, svc } = freshServiceAndDB();
+    submitAndConfirm(svc, db, 'ci4', PERSONA_ANSWERS.arjun.answers, 'HOLD');
+    const result = svc.canInvest('ci4', 5); // Arjun is level 7, learn 5 is below
+    expect(result.learnGate).toBeNull();
+  });
+
+  test('403 for child account', () => {
+    const { db, svc } = freshServiceAndDB();
+    db.addInvestor('ci5', 'c@example.com', true);
+    expect(() => svc.canInvest('ci5'))
+      .toThrow(expect.objectContaining({ status: 403 }));
+  });
+});

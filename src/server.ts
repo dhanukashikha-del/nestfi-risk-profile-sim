@@ -73,6 +73,27 @@ app.post('/api/risk-profile/email/resend', (_req, res) => {
   }
 });
 
+app.post('/api/risk-profile/update', (_req, res) => {
+  try {
+    const result = svc.startUpdate('demo');
+    res.json(result);
+  } catch (e) {
+    if (e instanceof ApiError) return res.status(e.status).json({ error: e.message });
+    throw e;
+  }
+});
+
+app.get('/api/risk-profile/can-invest', (req, res) => {
+  try {
+    const learnLevel = req.query.learnLevel ? parseInt(req.query.learnLevel as string) : null;
+    const result = svc.canInvest('demo', learnLevel);
+    res.json(result);
+  } catch (e) {
+    if (e instanceof ApiError) return res.status(e.status).json({ error: e.message });
+    throw e;
+  }
+});
+
 // ---- Reset for reviewers
 
 app.post('/api/reset', (_req, res) => {
