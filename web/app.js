@@ -5,13 +5,15 @@ let questionnaire = null;
 let answers = {};       // code → optionId
 let stressAnswer = null;
 let confirmedResult = null;
-let currentScreen = 'doorway';
+let currentScreen = 'start';
 let currentQ = 0;       // 0-based index into flowOrder
 let simOffline = false;
 let simSaveFail = false;
 let simEmailFail = false;
 let lastSaveError = false;
-let returnToResult = false; // when changing answers from result screen
+let returnToResult = false;
+let returnToFlow = null;
+let isMinor = false;
 
 // 15 questions in flow order (STRESS between T6_seed and R1)
 const flowOrder = ['A1','A2','A3','A4','A5','A6','A7','A8','T1','T2','T4','T5','T6_seed','STRESS','R1'];
@@ -104,6 +106,8 @@ function answeredCount() { return scoredCodes.filter(c => answers[c]).length; }
 function render() {
   const phone = document.getElementById('phone');
   switch (currentScreen) {
+    case 'start': phone.innerHTML = renderStart(); break;
+    case 'request_parent': phone.innerHTML = renderRequestParent(); break;
     case 'doorway': phone.innerHTML = renderDoorway(); break;
     case 'intro': phone.innerHTML = renderIntro(); break;
     case 'why': phone.innerHTML = renderWhySheet(); break;
@@ -125,7 +129,31 @@ function render() {
     case 'flow_placeholder': phone.innerHTML = renderFlowPlaceholder(); break;
     default: phone.innerHTML = renderDoorway();
   }
-  updateWorkings();
+}
+
+// ---------------------------------------------------------------- screen: start (choose a flow)
+
+function renderStart() {
+  return `
+    <div class="screen center-screen" style="gap:20px">
+      <div style="font-size:28px;font-weight:600;text-align:center">NESTfi</div>
+      <div style="font-size:16px;color:var(--text-secondary);text-align:center">Choose how you'd like to invest</div>
+      <div style="display:flex;flex-direction:column;gap:10px;width:100%;margin-top:20px">
+        <button class="btn-primary" onclick="enterFlow('learn_and_invest')">Learn and invest</button>
+        <button class="btn-secondary" onclick="enterFlow('goals')">Goals</button>
+        <button class="btn-secondary" onclick="enterFlow('build_your_own')">Build your own portfolio</button>
+      </div>
+    </div>`;
+}
+
+function renderRequestParent() {
+  return `
+    <div class="screen center-screen" style="gap:16px">
+      <svg width="72" height="72" viewBox="0 0 72 72" fill="none"><circle cx="36" cy="36" r="36" fill="#F1EFFC"/><path d="M36 22a8 8 0 1 1 0 16 8 8 0 0 1 0-16z" fill="#6A57E3"/><path d="M22 48c0-6 6-10 14-10s14 4 14 10" stroke="#6A57E3" stroke-width="3" stroke-linecap="round"/></svg>
+      <div style="font-size:22px;font-weight:600">Request parent</div>
+      <div style="font-size:16px;color:var(--text-secondary);text-align:center;line-height:1.5">A child is advised under the parent's profile. Ask your parent to complete the risk profile on their account.</div>
+      <div class="btn-bottom" style="width:100%"><button class="btn-secondary" onclick="fullReset()">Back</button></div>
+    </div>`;
 }
 
 // ---------------------------------------------------------------- screen: doorway (1, 16)
@@ -779,29 +807,22 @@ async function doConfirmUpdate() {
   if (status === 'ok') { currentScreen = 'result_updated'; }
   else if (status === 'email_failed') { currentScreen = 'email_failed'; }
   render();
-  await updateWorkings();
 }
 
-// ---------------------------------------------------------------- dev bar
-
-function toggleOffline() {
-  simOffline = !simOffline;
-  document.getElementById('btn-offline').textContent = `Offline: ${simOffline ? 'on' : 'off'}`;
-  document.getElementById('btn-offline').classList.toggle('active', simOffline);
-  render();
+function renderFlowPlaceholder() {
+  const labels = { learn_and_invest: 'Learn and invest', goals: 'Goals', build_your_own: 'Build your own portfolio' };
+  return `
+    <div class="screen center-screen" style="gap:16px">
+      <div style="font-size:48px">&#127919;</div>
+      <div style="font-size:22px;font-weight:600">${labels[returnToFlow] || returnToFlow}</div>
+      <div style="font-size:16px;color:var(--text-secondary);text-align:center">You're in. Your risk profile level is ${confirmedResult ? confirmedResult.level : '—'}.</div>
+      <div class="btn-bottom" style="width:100%">
+        <a href="#" onclick="event.preventDefault();fullReset()" style="display:flex;align-items:center;justify-content:center;height:44px;color:var(--brand-purple);font-size:16px;font-weight:600;text-decoration:none">Start again</a>
+      </div>
+    </div>`;
 }
 
-function toggleSaveFail() {
-  simSaveFail = !simSaveFail;
-  document.getElementById('btn-savefail').textContent = `Save fail: ${simSaveFail ? 'on' : 'off'}`;
-  document.getElementById('btn-savefail').classList.toggle('active', simSaveFail);
-}
-
-function toggleEmailFail() {
-  simEmailFail = !simEmailFail;
-  document.getElementById('btn-emailfail').textContent = `Email fail: ${simEmailFail ? 'on' : 'off'}`;
-  document.getElementById('btn-emailfail').classList.toggle('active', simEmailFail);
-}
+// ---------------------------------------------------------------- dev bar: fill sample answers
 
 async function loadPersona(name) {
   if (!name) return;
@@ -810,6 +831,21 @@ async function loadPersona(name) {
   stressAnswer = null;
   confirmedResult = null;
   lastSaveError = false;
+  returnToFlow = null;
+  isMinor = false;
+
+  if (name === 'ananya') {
+    // Ananya is 15, a minor. Call the entry gate — she should be sent to Request parent.
+    isMinor = true;
+    // Re-create investor as minor
+    // The reset already created a non-minor demo. We need the server to know she's a minor.
+    // For the sim, we just show the request parent screen.
+    currentScreen = 'request_parent';
+    render();
+    document.getElementById('persona-select').value = '';
+    return;
+  }
+
   const p = PERSONAS[name];
   for (const code of flowOrder) {
     const optId = p[code];
@@ -817,140 +853,10 @@ async function loadPersona(name) {
     else { answers[code] = optId; }
     await apiSaveAnswer(code, optId);
   }
+  returnToFlow = 'learn_and_invest';
   currentScreen = 'confirm';
-  await updateWorkings();
   render();
   document.getElementById('persona-select').value = '';
-}
-
-let returnToFlow = null;
-
-async function startFromFlow(flow) {
-  if (!flow) return;
-  document.getElementById('flow-select').value = '';
-  try {
-    const res = await fetch(`${API}/investment-flows/${flow}/enter`, { method: 'POST' });
-    const data = await res.json();
-    if (data.allowed) {
-      // Already has a profile — show the flow placeholder
-      returnToFlow = flow;
-      currentScreen = 'flow_placeholder';
-      render();
-    } else {
-      // Needs risk profile — go to doorway
-      returnToFlow = flow;
-      currentScreen = 'doorway';
-      render();
-    }
-  } catch { currentScreen = 'doorway'; render(); }
-}
-
-function renderFlowPlaceholder() {
-  const labels = { learn_and_invest: 'Learn and invest', goals: 'Goals', build_your_own: 'Build your own portfolio' };
-  return `
-    <div class="screen center-screen">
-      <div style="font-size:48px;margin-bottom:16px">&#127919;</div>
-      <div style="font-size:22px;font-weight:600;margin-bottom:8px">${labels[returnToFlow] || returnToFlow}</div>
-      <div style="font-size:16px;color:var(--text-secondary);text-align:center">You're in. Your risk profile level is ${confirmedResult ? confirmedResult.level : '—'}.</div>
-      <div class="btn-bottom" style="width:100%"><button class="btn-secondary" onclick="goScreen('doorway')">Back to Set up investing</button></div>
-    </div>`;
-}
-
-function triggerLearnGate() {
-  if (!confirmedResult) { alert('Confirm a profile first'); return; }
-  window._simLearnLevel = confirmedResult.level + 3; // simulate finishing a higher Learn level
-  goScreen('learn_gate');
-}
-
-async function resetAll() {
-  await fetch(`${API}/reset`, { method: 'POST' });
-  answers = {};
-  stressAnswer = null;
-  confirmedResult = null;
-  currentScreen = 'doorway';
-  currentQ = 0;
-  lastSaveError = false;
-  returnToResult = false;
-  await updateWorkings();
-  render();
-}
-
-// ---------------------------------------------------------------- workings panel
-
-let lastWorkings = null;
-
-async function updateWorkings() {
-  try {
-    const res = await fetch(`${API}/workings`);
-    lastWorkings = await res.json();
-  } catch { return; }
-
-  const el = document.getElementById('workings-content');
-  const w = lastWorkings;
-  if (!w || !w.drafts || Object.keys(w.drafts).length === 0) {
-    el.innerHTML = 'Submit answers to see workings.';
-    return;
-  }
-
-  const p = w.profile;
-  let html = '';
-
-  // Answers table
-  html += '<div class="wk-section"><h4>Answers</h4>';
-  for (const code of flowOrder) {
-    const optId = w.drafts[code];
-    if (optId) html += `<div class="wk-row"><span class="wk-label">${code}</span><span class="wk-value">${optId}</span></div>`;
-  }
-  html += '</div>';
-
-  if (p) {
-    html += '<div class="wk-divider"></div>';
-    html += '<div class="wk-section"><h4>Ability (Factor 1)</h4>';
-    html += `<div class="wk-row"><span class="wk-label">Score</span><span class="wk-value">${p.ability_score}</span></div>`;
-    html += `<div class="wk-row"><span class="wk-label">Band</span><span class="wk-value">${p.ability_band}</span></div>`;
-    html += `<div class="wk-row"><span class="wk-label">Absorbable loss</span><span class="wk-value">${lossCurve(p.ability_score)}%</span></div>`;
-    html += `<div class="wk-row"><span class="wk-label">Ceiling</span><span class="wk-value ${p.binding_constraint === 'ability' ? 'binding' : ''}">${p.ability_ceiling}</span></div>`;
-    html += '</div>';
-
-    html += '<div class="wk-divider"></div>';
-    html += '<div class="wk-section"><h4>Tolerance (Factor 2)</h4>';
-    html += `<div class="wk-row"><span class="wk-label">Total</span><span class="wk-value">${p.tolerance_total}</span></div>`;
-    html += `<div class="wk-row"><span class="wk-label">Band</span><span class="wk-value">${p.tolerance_band}</span></div>`;
-    html += `<div class="wk-row"><span class="wk-label">Trait level</span><span class="wk-value">${p.tolerance_level}</span></div>`;
-    html += `<div class="wk-row"><span class="wk-label">Anchor level</span><span class="wk-value ${p.binding_constraint === 'tolerance' ? 'binding' : ''}">${p.anchor_level ?? '—'}</span></div>`;
-    html += `<div class="wk-row"><span class="wk-label">Knowledge (T3)</span><span class="wk-value">3 (fixed)</span></div>`;
-    html += '</div>';
-
-    html += '<div class="wk-divider"></div>';
-    html += '<div class="wk-section"><h4>Reconcile</h4>';
-    html += `<div class="wk-row"><span class="wk-label">Teaching ceiling</span><span class="wk-value">${p.literacy_ceiling ?? 'null'}</span></div>`;
-    html += `<div class="wk-row"><span class="wk-label">Binding</span><span class="wk-value binding">${p.binding_constraint}</span></div>`;
-    html += `<div class="wk-row"><span class="wk-label">What set this</span><span class="wk-value">${p.what_set_this}</span></div>`;
-    html += `<div class="wk-row"><span class="wk-label">Light</span><span class="wk-value">${p.light}</span></div>`;
-    html += `<div class="wk-row"><span class="wk-label">Qualified</span><span class="wk-value">${p.qualified_level}</span></div>`;
-    html += `<div class="wk-row"><span class="wk-label">Earned</span><span class="wk-value">${p.earned_level}</span></div>`;
-    html += `<div class="wk-row"><span class="wk-label">Advice</span><span class="wk-value">${p.advice_level}</span></div>`;
-    html += '</div>';
-
-    html += '<div class="wk-divider"></div>';
-    html += '<div class="wk-section"><h4>Result</h4>';
-    html += `<div class="wk-row"><span class="wk-label" style="font-size:16px;font-weight:700">Level</span><span class="wk-value" style="font-size:20px;color:var(--brand-purple)">${p.earned_level}</span></div>`;
-    html += '</div>';
-  }
-
-  if (w.composureSeed !== null) {
-    html += '<div class="wk-divider"></div>';
-    html += `<div class="wk-section"><h4>Composure</h4>`;
-    html += `<div class="wk-row"><span class="wk-label">Seed</span><span class="wk-value">${w.composureSeed}</span></div>`;
-    html += `</div>`;
-  }
-
-  el.innerHTML = html;
-}
-
-function lossCurve(score) {
-  const s = Math.min(Math.max(score, 0), 100) / 100;
-  return (2 + 32 * Math.pow(s, 1.1)).toFixed(1);
 }
 
 // ---------------------------------------------------------------- boot

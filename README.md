@@ -1,6 +1,8 @@
 # NESTfi Risk Profile Simulator
 
-Stakeholder demo of the first-time risk profile: 14 questions, the simulated fall, the engine, and every screen from the spec. The professor can check each persona against his table using the dropdown.
+Stakeholder demo of the first-time risk profile: 14 questions, the simulated fall, the engine, and every screen from the spec. Choose an investment flow, complete the profile, and see the result. Sample answers for eight personas can be loaded from the dropdown.
+
+Spec: `RISK_PROFILE_SPEC.md` in the handover folder. Scoring follows the base file (`Nestfi_Risk_Profiler_Manual.docx`).
 
 ## Run locally
 
@@ -14,7 +16,7 @@ npm start
 
 ```bash
 npm test
-# 406 tests: 188 engine + 218 API integration
+# 448 tests: 188 engine, 249 API integration, 11 status/entry gate
 ```
 
 ## Deploy to Render
@@ -32,12 +34,28 @@ docker build -t nestfi-sim .
 docker run -p 3000:3000 nestfi-sim
 ```
 
+## API calls
+
+| # | Call | Method | What |
+|---|---|---|---|
+| 1 | `/api/risk-profile/questionnaire` | GET | Questions, options, order, version |
+| 2 | `/api/risk-profile/answers/:code` | PUT | Save one answer by option id |
+| 3 | `/api/risk-profile/confirm` | POST | Score, save profile, send email, return result |
+| 4 | `/api/risk-profile` | GET | Latest confirmed profile |
+| 5 | `/api/risk-profile/email/resend` | POST | Resend the summary email |
+| 6 | `/api/risk-profile/update` | POST | Start an update (draft from last profile) |
+| 7 | `/api/risk-profile/can-invest` | GET | Can the investor proceed? |
+| 8 | `/api/risk-profile/monthly-check` | POST | Monthly progression: one rung if Learn is done |
+| 9 | `/api/risk-profile/status` | GET | Per-person status for every screen |
+| 10 | `/api/investment-flows/:flow/enter` | POST | Entry gate for Learn and invest, Goals, Build your own |
+| — | `/api/reset` | POST | Clear the store (simulator only) |
+
 ## What the simulator shows
 
-- **Phone frame** (390 px): every screen from SCREEN_SPEC.md in order, same copy, same exits.
-- **Workings panel**: live engine internals — every answer with its option id, ability score/band/ceiling, tolerance traits/total/level, anchor level, teaching ceiling, binding constraint, final level.
-- **Dev bar**: toggle offline, save-failed, email-failed states. Load any of the eight test personas from the dropdown.
-- **Reset**: clears the store so a reviewer can start again.
+- **Start screen**: three investment flow buttons. Each calls the entry gate.
+- **Phone frame** (390 px): every screen from the spec in order, same copy, same exits.
+- **Fill sample answers**: dropdown loads one of eight personas. Ananya (15, minor) hits the entry gate and is sent to Request parent.
+- **Flow placeholder**: after the result, Continue returns to the chosen flow with a Start again link that resets.
 
 ## No numbers in code
 
