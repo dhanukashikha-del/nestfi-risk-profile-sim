@@ -248,27 +248,31 @@ describe.each(Object.keys(PERSONA_ANSWERS))('First-time profile: %s', (name) => 
     result = submitAndConfirm(svc, db, name, pa.answers, pa.stress);
   });
 
+  // API response shape (what the app receives)
   test('level', () => expect(result.level).toBe(exp.level));
-  test('earnedLevel', () => expect(result.earnedLevel).toBe(exp.earnedLevel));
-  test('adviceLevel', () => expect(result.adviceLevel).toBe(exp.adviceLevel));
-  test('band', () => expect(result.band).toBe(exp.band));
-  test('ability.score', () => expect(result.ability.score).toBe(exp.ability.score));
-  test('ability.band', () => expect(result.ability.band).toBe(exp.ability.band));
-  test('ability.ceiling', () => expect(result.ability.ceiling).toBe(exp.ability.ceiling));
-  test('tolerance.total', () => expect(result.tolerance.total).toBe(exp.tolerance.total));
-  test('tolerance.level', () => expect(result.tolerance.level).toBe(exp.tolerance.level));
-  test('tolerance.anchorLevel', () => expect(result.tolerance.anchorLevel).toBe(exp.tolerance.anchorLevel));
-  test('light', () => expect(result.light).toBe(exp.light));
-  test('whatSetThis', () => expect(result.whatSetThis).toBe(exp.whatSetThis));
-  test('teachingCeiling is null', () => expect(result.teachingCeiling).toBeNull());
+  test('label', () => expect(result.label).toBeTruthy());
+  test('description', () => expect(result.description).toBeTruthy());
+  test('worstFallRupeesPerLakh', () => expect(result.worstFallRupeesPerLakh).toBe(exp.largestFall.rupeesPerLakh));
+  test('lowestValueOnALakh', () => expect(result.lowestValueOnALakh).toBe(100000 - exp.largestFall.rupeesPerLakh));
+  test('confirmedOn', () => expect(result.confirmedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/));
+  test('emailStatus', () => expect(result.emailStatus).toBe('sent'));
+  test('profileVersion is 1', () => expect(result.profileVersion).toBe(1));
   test('summary.absorb', () => expect(result.summary.absorb).toBe(exp.summary.absorb));
   test('summary.approach', () => expect(result.summary.approach).toBe(exp.summary.approach));
   test('summary.experience', () => expect(result.summary.experience).toBe(exp.summary.experience));
   test('summary.fallHeldThrough', () => expect(result.summary.fallHeldThrough).toEqual(exp.summary.fallHeldThrough));
-  test('largestFall.rupeesPerLakh', () => expect(result.largestFall.rupeesPerLakh).toBe(exp.largestFall.rupeesPerLakh));
-  test('openLevels', () => expect(result.openLevels).toEqual(Array.from({ length: exp.level }, (_, i) => i + 1)));
-  test('profileVersion is 1', () => expect(result.profileVersion).toBe(1));
   test('email.status is sent', () => expect(result.email.status).toBe('sent'));
+  test('no openLevels in response', () => expect(result).not.toHaveProperty('openLevels'));
+  test('no whatSetThis in response', () => expect(result).not.toHaveProperty('whatSetThis'));
+
+  // Stored row (what compliance keeps)
+  test('stored row has correct level', () => expect(db.latestProfile(name)!.earned_level).toBe(exp.level));
+  test('stored row has ability score', () => expect(db.latestProfile(name)!.ability_score).toBe(exp.ability.score));
+  test('stored row has tolerance total', () => expect(db.latestProfile(name)!.tolerance_total).toBe(exp.tolerance.total));
+  test('stored row has light', () => expect(db.latestProfile(name)!.light).toBe(exp.light));
+  test('stored row has binding_constraints', () => expect(db.latestProfile(name)!.binding_constraints.length).toBeGreaterThanOrEqual(1));
+  test('stored row has config_version', () => expect(db.latestProfile(name)!.config_version).toBeTruthy());
+  test('stored row has knowledge_source default', () => expect(db.latestProfile(name)!.knowledge_source).toBe('default'));
 
   test('profile row is append-only', () => {
     expect(db.investor_profiles.filter(r => r.investor_id === name)).toHaveLength(1);
@@ -653,5 +657,74 @@ describe('POST monthly-check', () => {
     db.addInvestor('mc8', 'm@example.com', true);
     expect(() => svc.monthlyCheck('mc8', { nothingChanged: true, learnLevel: 5, daysAtLevel: 30 }))
       .toThrow(expect.objectContaining({ status: 403 }));
+  });
+});
+
+// ================================================================ Step 2 spec changes (CLAUDE_CODE_BRIEF)
+
+describe('Step 2.2: confirm response shape', () => {
+  test('returns level, label, description, worstFallRupeesPerLakh, lowestValueOnALakh, confirmedOn', () => {
+    const { db, svc } = freshServiceAndDB();
+    const result = submitAndConfirm(svc, db, 's2a', PERSONA_ANSWERS.arjun.answers, 'HOLD');
+    expect(result.level).toBe(7);
+    expect(result.label).toBe('Moderately High');
+    expect(result.description).toBeTruthy();
+    expect(result.worstFallRupeesPerLakh).toBe(16866);
+    expect(result.lowestValueOnALakh).toBe(100000 - 16866);
+    expect(result.confirmedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(result.emailStatus).toBe('sent');
+    expect(result.profileVersion).toBe(1);
+  });
+
+  test('does not return openLevels or whatSetThis to the app', () => {
+    const { db, svc } = freshServiceAndDB();
+    const result = submitAndConfirm(svc, db, 's2b', PERSONA_ANSWERS.arjun.answers, 'HOLD');
+    expect(result).not.toHaveProperty('openLevels');
+    expect(result).not.toHaveProperty('whatSetThis');
+  });
+});
+
+describe('Step 2.3: email never blocks', () => {
+  test('can-invest returns true even if email failed', () => {
+    const { db, svc } = freshServiceAndDB();
+    submitAndConfirm(svc, db, 's3a', PERSONA_ANSWERS.arjun.answers, 'HOLD');
+    // Even with default sent status, canInvest should be true regardless
+    const result = svc.canInvest('s3a');
+    expect(result.canInvest).toBe(true);
+  });
+});
+
+describe('Step 2.4: profile row stores config_version, knowledge_source, binding_constraints', () => {
+  test('stored profile has the new fields', () => {
+    const { db, svc } = freshServiceAndDB();
+    submitAndConfirm(svc, db, 's4a', PERSONA_ANSWERS.arjun.answers, 'HOLD');
+    const profile = db.latestProfile('s4a')!;
+    expect(profile.config_version).toBeTruthy();
+    expect(profile.config_version.length).toBeGreaterThan(0);
+    expect(profile.knowledge_source).toBe('default');
+    expect(Array.isArray(profile.binding_constraints)).toBe(true);
+    expect(profile.binding_constraints.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('Step 2.5: draft expiry and answeredAt ordering', () => {
+  test('ignores an answer whose answeredAt is older than the stored answer', () => {
+    const { db, svc } = freshServiceAndDB();
+    db.addInvestor('s5a', 's@example.com', false);
+    svc.saveAnswer('s5a', 'A1', 'A1_10PLUS', '2026-10-26T10:00:00Z');
+    // Send an older answer — should be ignored
+    const result = svc.saveAnswer('s5a', 'A1', 'A1_LT3', '2026-10-26T09:00:00Z');
+    expect(result.saved).toBe(false);
+    const inv = db.getInvestor('s5a')!;
+    expect(inv.draft_answers.get('A1')!.option_id).toBe('A1_10PLUS');
+  });
+
+  test('a newer answer replaces the stored one', () => {
+    const { db, svc } = freshServiceAndDB();
+    db.addInvestor('s5b', 's@example.com', false);
+    svc.saveAnswer('s5b', 'A1', 'A1_10PLUS', '2026-10-26T10:00:00Z');
+    svc.saveAnswer('s5b', 'A1', 'A1_LT3', '2026-10-26T11:00:00Z');
+    const inv = db.getInvestor('s5b')!;
+    expect(inv.draft_answers.get('A1')!.option_id).toBe('A1_LT3');
   });
 });

@@ -24,6 +24,12 @@
     <option value="vikram">Vikram, 44, sold in fall</option>
     <option value="ananya">Ananya, 15, minor account</option>
   </select>
+  <select id="flow-select" onchange="startFromFlow(this.value)">
+    <option value="">Start from...</option>
+    <option value="learn_and_invest">Learn and invest</option>
+    <option value="goals">Goals</option>
+    <option value="build_your_own">Build your own portfolio</option>
+  </select>
   <button onclick="goScreen('my_profile')">My profile</button>
   <button onclick="triggerLearnGate()">Learn gate</button>
   <button onclick="resetAll()">Reset</button>

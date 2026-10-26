@@ -19,6 +19,9 @@ export interface InvestorProfileRow {
   light: string;
   binding_constraint: string;
   what_set_this: string;
+  binding_constraints: string[];    // all parts that tied for lowest
+  config_version: string;           // hash of config files
+  knowledge_source: string;         // "default" for V1
   engine_version: string;
   question_bank_version: string;
 }

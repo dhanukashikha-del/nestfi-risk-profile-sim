@@ -1,3 +1,6 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import * as crypto from 'crypto';
 import {
   loadConfig,
   getLevels,
@@ -14,6 +17,7 @@ import { IRiskProfileStore } from './db';
 
 const ENGINE_VERSION = '1.0.0';
 const QUESTION_BANK_VERSION = '2026-10-01';
+const DRAFT_MAX_AGE_DAYS = 7;
 
 // The 14 scored question codes in order asked, plus the STRESS seed prompt.
 const SCORED_CODES = [
@@ -65,6 +69,26 @@ export class ApiError extends Error {
 }
 
 // ---------------------------------------------------------------- service
+
+function computeConfigVersion(): string {
+  const configDir = path.join(__dirname, '..', '..', 'config', 'riskProfile');
+  try {
+    const files = fs.readdirSync(configDir).sort();
+    const hash = crypto.createHash('sha256');
+    for (const f of files) {
+      hash.update(fs.readFileSync(path.join(configDir, f)));
+    }
+    return hash.digest('hex').slice(0, 12);
+  } catch {
+    return 'unknown';
+  }
+}
+
+let _configVersion: string | null = null;
+function getConfigVersion(): string {
+  if (!_configVersion) _configVersion = computeConfigVersion();
+  return _configVersion;
+}
 
 export class RiskProfileService {
   constructor(private db: IRiskProfileStore) {}
@@ -140,6 +164,23 @@ export class RiskProfileService {
       }
     }
 
+    // Drop drafts older than 7 days
+    if (inv.draft_answers.size > 0) {
+      const oldest = [...inv.draft_answers.values()].reduce((min, v) =>
+        v.answered_at < min ? v.answered_at : min, answeredAt);
+      const ageMs = Date.now() - new Date(oldest).getTime();
+      if (ageMs > DRAFT_MAX_AGE_DAYS * 24 * 60 * 60 * 1000) {
+        inv.draft_answers.clear();
+      }
+    }
+
+    // Ignore an answer whose answeredAt is older than the stored answer to the same question
+    const existing = inv.draft_answers.get(questionCode);
+    if (existing && answeredAt < existing.answered_at) {
+      const answered = SCORED_CODES.filter(c => inv.draft_answers.has(c)).length;
+      return { saved: false, answered, total: 14 };
+    }
+
     // Idempotent save
     inv.draft_answers.set(questionCode, { option_id: optionId, answered_at: answeredAt });
 
@@ -203,6 +244,19 @@ export class RiskProfileService {
     const version = this.db.nextProfileVersion(investorId);
     const assessedOn = new Date().toISOString();
 
+    // Compute binding_constraints: all parts that tied for lowest
+    const factors = [
+      { name: 'ability', value: ab.ceiling_level },
+      { name: 'tolerance', value: tol.level },
+    ];
+    const minValue = Math.min(...factors.map(f => f.value));
+    const bindingConstraints = factors.filter(f => f.value === minValue).map(f => f.name);
+    if (tol.binding_input === 'rupee anchor' && tol.level === minValue) {
+      // Replace 'tolerance' with 'rupee_loss' when the anchor is what set tolerance
+      const idx = bindingConstraints.indexOf('tolerance');
+      if (idx >= 0) bindingConstraints[idx] = 'rupee_loss';
+    }
+
     this.db.insertProfile({
       investor_id: investorId,
       profile_version: version,
@@ -221,6 +275,9 @@ export class RiskProfileService {
       light: rec.light.toLowerCase(),
       binding_constraint: rec.binding_constraint,
       what_set_this: whatSetThis,
+      binding_constraints: bindingConstraints,
+      config_version: getConfigVersion(),
+      knowledge_source: 'default',
       engine_version: ENGINE_VERSION,
       question_bank_version: QUESTION_BANK_VERSION,
     });
@@ -279,29 +336,20 @@ export class RiskProfileService {
 
     return {
       profileVersion: version,
-      engineVersion: ENGINE_VERSION,
-      band: bandFromLevel(level),
       level,
-      earnedLevel: rec.earned_level,
-      adviceLevel: rec.advice_level,
-      ability: { score: ab.score, band: ab.band.toLowerCase(), ceiling: ab.ceiling_level },
-      tolerance: { total: tol.total, level: tol.level, anchorLevel: tol.anchor_level },
-      teachingCeiling: null,
-      bindingConstraint: whatSetThis,
-      light: rec.light.toLowerCase(),
+      label: levelRow.riskometer_band,
+      description: (levelRow as any).description || '',
+      worstFallRupeesPerLakh: levelRow.worst_fall_rs_per_lakh,
+      lowestValueOnALakh: 100000 - levelRow.worst_fall_rs_per_lakh,
+      confirmedOn: assessedOn.slice(0, 10),
+      emailStatus,
+      // Summary for the confirm preview screen
       summary: {
         absorb: ab.band,
         approach: APPROACH_LABELS[tol.band] || tol.band,
         experience: EXPERIENCE_LABELS[t4OptId] || '',
         fallHeldThrough: { percent: fallPercent, rupees: fallRupees },
       },
-      openLevels: Array.from({ length: level }, (_, i) => i + 1),
-      largestFall: {
-        level,
-        rupeesPerLakh: levelRow.worst_fall_rs_per_lakh,
-        period: '2011 to 2026',
-      },
-      whatSetThis,
       email: { to: this.maskEmail(inv.email), status: emailStatus },
       ...(previousProfile ? {
         previousLevel: previousProfile.earned_level,
@@ -343,29 +391,13 @@ export class RiskProfileService {
 
     return {
       profileVersion: profile.profile_version,
-      engineVersion: profile.engine_version,
-      band: bandFromLevel(level),
       level,
-      earnedLevel: profile.earned_level,
-      adviceLevel: profile.advice_level,
-      ability: { score: profile.ability_score, band: profile.ability_band.toLowerCase(), ceiling: profile.ability_ceiling },
-      tolerance: { total: profile.tolerance_total, level: profile.tolerance_level, anchorLevel: profile.anchor_level },
-      teachingCeiling: profile.literacy_ceiling,
-      bindingConstraint: whatSetThis,
-      light: profile.light,
-      summary: {
-        absorb: profile.ability_band,
-        approach: APPROACH_LABELS[profile.tolerance_band] || profile.tolerance_band,
-        experience: t4 ? (EXPERIENCE_LABELS[t4.option_id] || '') : '',
-        fallHeldThrough: { percent: fallPercent, rupees: fallRupees },
-      },
-      openLevels: Array.from({ length: level }, (_, i) => i + 1),
-      largestFall: {
-        level,
-        rupeesPerLakh: levelRow.worst_fall_rs_per_lakh,
-        period: '2011 to 2026',
-      },
-      whatSetThis,
+      label: levelRow.riskometer_band,
+      description: levelRow.description,
+      worstFallRupeesPerLakh: levelRow.worst_fall_rs_per_lakh,
+      lowestValueOnALakh: 100000 - levelRow.worst_fall_rs_per_lakh,
+      confirmedOn: profile.assessed_on.slice(0, 10),
+      emailStatus: emailLog?.status ?? 'not_sent',
       email: emailLog ? { to: this.maskEmail(inv.email), status: emailLog.status } : undefined,
       reviewDueOn: reviewDueOn.toISOString().slice(0, 10),
       ...(answeredSoFar !== undefined ? { answeredSoFar } : {}),
@@ -404,7 +436,8 @@ export class RiskProfileService {
     if (!profile) throw new ApiError(404, 'No profile yet');
     const emailLog = this.db.findEmailLog(investorId, profile.profile_version);
     const emailStatus = emailLog?.status ?? 'not_sent';
-    const canInvest = emailStatus === 'sent';
+    // Email never blocks investing (Step 2.3). Keep recording the status.
+    const canInvest = true;
 
     let learnGate = null;
     if (learnLevel != null && learnLevel > profile.earned_level) {

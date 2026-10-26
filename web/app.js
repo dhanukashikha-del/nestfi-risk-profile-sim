@@ -122,6 +122,7 @@ function render() {
     case 'answers_edit': phone.innerHTML = renderAnswersEdit(); break;
     case 'confirm_update': phone.innerHTML = renderConfirmUpdate(); break;
     case 'result_updated': phone.innerHTML = renderResultUpdated(); break;
+    case 'flow_placeholder': phone.innerHTML = renderFlowPlaceholder(); break;
     default: phone.innerHTML = renderDoorway();
   }
   updateWorkings();
@@ -390,15 +391,13 @@ function renderResult() {
   const r = confirmedResult;
   if (!r) return '<div class="screen">No result yet.</div>';
   const level = r.level;
-  const bandLabel = level <= 5 ? 'Low' : level <= 10 ? 'Moderate' : 'High';
-  const showWhatSet = r.whatSetThis === 'ability_horizon' || r.whatSetThis === 'ability_withdrawals';
-  const whatSetText = r.whatSetThis === 'ability_horizon' ? 'Money needed within 5 years' : 'Withdrawals over 5% a year';
-  const notYetText = level >= 15 ? null : `Level ${level+1} and above`;
-  const fall = r.largestFall.rupeesPerLakh.toLocaleString('en-IN');
-  const tickIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="11" fill="#CFFCE4"/><path d="M7 12.5l3 3 7-7" stroke="#009466" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const dashIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="10" stroke="#98A2B3" stroke-width="2" stroke-dasharray="3 3"/></svg>`;
-  const fallIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><path d="M4 8l6 6 4-4 6 6" stroke="#B03C00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 11v5h-5" stroke="#B03C00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const whatIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="10" stroke="#6A57E3" stroke-width="2"/><path d="M12 8v4M12 16h.01" stroke="#6A57E3" stroke-width="2" stroke-linecap="round"/></svg>`;
+  const label = r.label || '';
+  const description = r.description || '';
+  const lowestValue = (r.lowestValueOnALakh || 0).toLocaleString('en-IN');
+  const waveIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="11" fill="#F1EFFC"/><path d="M5 12c2-4 4-4 6 0s4 4 6 0 3-2 3-2" stroke="#6A57E3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const levelsIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 20h4v-5H4zM10 20h4v-9h-4zM16 20h4V5h-4z" stroke="#6A57E3" stroke-width="2" stroke-linejoin="round"/></svg>`;
+  const goalsIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="#6A57E3" stroke-width="2"/><circle cx="12" cy="12" r="3.5" stroke="#6A57E3" stroke-width="2"/></svg>`;
+  const portfolioIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><path d="M16.5 13.5v6M13.5 16.5h6" stroke="#6A57E3" stroke-width="2" stroke-linecap="round"/></svg>`;
 
   return `
     <div class="screen" style="gap:16px">
@@ -406,20 +405,25 @@ function renderResult() {
       <div style="display:flex;flex-direction:column;gap:6px;text-align:center">
         <span style="font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--brand-purple)">Your risk profile</span>
         <div style="font-size:32px;font-weight:600;line-height:1.15">Level ${level}</div>
-        <div style="font-size:16px;color:var(--text-secondary)">${bandLabel}</div>
+        <div style="font-size:16px;color:var(--text-secondary)">${label}</div>
+        <div style="font-size:16px;line-height:1.5;margin-top:8px">${description}</div>
       </div>
-      <a href="#" onclick="event.preventDefault()" class="video-card" style="background:#F1EFFC;text-decoration:none;color:var(--text-primary)">
-        <span class="video-icon">&#9654;</span>
-        <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:16px;font-weight:600">What Level ${level} means</span><span style="font-size:13px;color:var(--text-secondary)">1 min</span></span>
-      </a>
-      <div class="info-card">
-        <div class="info-row" style="display:flex;align-items:center;gap:12px">${tickIcon}<span style="display:flex;flex-direction:column;gap:2px"><span class="label" style="font-size:13px">Open to you</span><span class="value" style="font-size:16px">Levels 1 to ${level}</span></span></div>
-        ${notYetText ? `<div class="info-row" style="display:flex;align-items:center;gap:12px">${dashIcon}<span style="display:flex;flex-direction:column;gap:2px"><span class="label" style="font-size:13px">Not yet</span><span class="value" style="font-size:16px">${notYetText}</span></span></div>` : ''}
-        <div class="info-row" style="display:flex;align-items:center;gap:12px">${fallIcon}<span style="display:flex;flex-direction:column;gap:2px"><span class="label" style="font-size:13px">Largest fall, Level ${level}</span><span class="value" style="font-size:16px;font-variant-numeric:tabular-nums">Rs ${fall} on a lakh</span></span></div>
-        ${showWhatSet ? `<div class="info-row" style="display:flex;align-items:center;gap:12px">${whatIcon}<span style="display:flex;flex-direction:column;gap:2px"><span class="label" style="font-size:13px">What set this</span><span class="value" style="font-size:16px">${whatSetText}</span></span></div>` : ''}
+      <div style="display:flex;flex-direction:column;border:1px solid var(--border-default);border-radius:8px">
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 16px">
+          ${waveIcon}
+          <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Biggest dip since 2011</span><span style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">Rs 1,00,000 went to Rs ${lowestValue}</span></span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span style="font-size:13px;color:var(--text-secondary)">Used in every way you invest</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:8px;background:#F7F8FA">${levelsIcon}<span style="font-size:13px;font-weight:600;text-align:center">Levels</span></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:8px;background:#F7F8FA">${goalsIcon}<span style="font-size:13px;font-weight:600;text-align:center">Goals</span></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:8px;background:#F7F8FA">${portfolioIcon}<span style="font-size:13px;font-weight:600;text-align:center">Your own portfolio</span></div>
+        </div>
       </div>
       <div style="flex:1"></div>
-      <button class="btn-primary" onclick="goScreen('doorway')">Continue to agreement</button>
+      <button class="btn-primary" onclick="returnToFlow ? goScreen('flow_placeholder') : goScreen('doorway')">Continue</button>
     </div>`;
 }
 
@@ -428,13 +432,16 @@ function renderResult() {
 function renderEmailFailed() {
   return `
     <div class="screen center-screen">
-      <div class="center-icon" style="background:var(--error-bg);color:var(--error)">&#9993;</div>
-      <div class="center-title">We couldn't send your copy</div>
-      <div class="center-sub">Your profile is saved. Investing opens once the copy is delivered.</div>
+      <svg width="72" height="72" viewBox="0 0 72 72" fill="none"><circle cx="36" cy="36" r="36" fill="#FFEDEB"/><rect x="20" y="25" width="32" height="24" rx="3" stroke="#E70F00" stroke-width="3"/><path d="M22 28l14 11 14-11" stroke="#E70F00" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div style="display:flex;flex-direction:column;gap:8px;text-align:center">
+        <div style="font-size:26px;font-weight:600;line-height:1.2">We couldn't send your copy</div>
+        <div style="font-size:16px;color:var(--text-secondary);line-height:1.5">Your profile is saved. We will keep trying, and you can carry on.</div>
+      </div>
       <div class="email-box"><div class="label">Sending to</div><div class="addr">demo@nestfi.in</div></div>
       <div class="btn-bottom" style="width:100%">
-        <button class="btn-primary" onclick="doResend()">Try again</button>
-        <button class="btn-secondary" style="margin-top:8px">Change email</button>
+        <button class="btn-primary" onclick="currentScreen='result';render()">See my result</button>
+        <button class="btn-secondary" style="margin-top:8px" onclick="doResend()">Try again</button>
+        <a href="#" onclick="event.preventDefault()" style="display:flex;align-items:center;justify-content:center;height:44px;color:var(--brand-purple);font-size:16px;font-weight:600;text-decoration:none">Change email</a>
       </div>
     </div>`;
 }
@@ -814,6 +821,39 @@ async function loadPersona(name) {
   await updateWorkings();
   render();
   document.getElementById('persona-select').value = '';
+}
+
+let returnToFlow = null;
+
+async function startFromFlow(flow) {
+  if (!flow) return;
+  document.getElementById('flow-select').value = '';
+  try {
+    const res = await fetch(`${API}/investment-flows/${flow}/enter`, { method: 'POST' });
+    const data = await res.json();
+    if (data.allowed) {
+      // Already has a profile — show the flow placeholder
+      returnToFlow = flow;
+      currentScreen = 'flow_placeholder';
+      render();
+    } else {
+      // Needs risk profile — go to doorway
+      returnToFlow = flow;
+      currentScreen = 'doorway';
+      render();
+    }
+  } catch { currentScreen = 'doorway'; render(); }
+}
+
+function renderFlowPlaceholder() {
+  const labels = { learn_and_invest: 'Learn and invest', goals: 'Goals', build_your_own: 'Build your own portfolio' };
+  return `
+    <div class="screen center-screen">
+      <div style="font-size:48px;margin-bottom:16px">&#127919;</div>
+      <div style="font-size:22px;font-weight:600;margin-bottom:8px">${labels[returnToFlow] || returnToFlow}</div>
+      <div style="font-size:16px;color:var(--text-secondary);text-align:center">You're in. Your risk profile level is ${confirmedResult ? confirmedResult.level : '—'}.</div>
+      <div class="btn-bottom" style="width:100%"><button class="btn-secondary" onclick="goScreen('doorway')">Back to Set up investing</button></div>
+    </div>`;
 }
 
 function triggerLearnGate() {

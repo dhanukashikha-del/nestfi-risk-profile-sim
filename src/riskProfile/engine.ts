@@ -15,6 +15,7 @@ export interface LevelAnchor {
   riskometer_band: string;
   new_asset_at_level: string;
   growth_share_pct: number;
+  description: string;
   worst_fall_pct: number;
   worst_fall_pct_cummax: number;
 }
@@ -123,6 +124,7 @@ export function loadConfig(configDir: string): void {
       riskometer_band: row.riskometer_band,
       new_asset_at_level: row.new_asset_at_level,
       growth_share_pct: parseFloat(row.growth_share_pct),
+      description: row.description || '',
       worst_fall_pct,
       worst_fall_pct_cummax: cummax,
     });
