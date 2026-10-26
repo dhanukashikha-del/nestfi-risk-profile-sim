@@ -124,11 +124,12 @@ app.post('/api/investment-flows/:flow/enter', (req, res) => {
 
 // ---- Reset for reviewers
 
-app.post('/api/reset', (_req, res) => {
+app.post('/api/reset', (req, res) => {
   db = new RiskProfileDB();
   svc = new RiskProfileService(db);
-  seedDemoInvestor();
-  res.json({ reset: true });
+  const isMinor = req.body?.minor === true;
+  db.addInvestor('demo', 'demo@nestfi.in', isMinor);
+  res.json({ reset: true, minor: isMinor });
 });
 
 // ---- Workings endpoint: returns the current engine state for the live panel

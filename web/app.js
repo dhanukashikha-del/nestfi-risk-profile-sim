@@ -120,7 +120,6 @@ function render() {
     case 'confirmed': phone.innerHTML = renderConfirmed(); break;
     case 'result': phone.innerHTML = renderResult(); break;
     case 'email_failed': phone.innerHTML = renderEmailFailed(); break;
-    case 'learn_gate': phone.innerHTML = renderLearnGate(); break;
     case 'my_profile': phone.innerHTML = renderMyProfile(); break;
     case 'update_sheet': phone.innerHTML = renderUpdateSheet(); break;
     case 'answers_edit': phone.innerHTML = renderAnswersEdit(); break;
@@ -607,55 +606,43 @@ function jumpToQuestion(idx) {
   render();
 }
 
-// ---------------------------------------------------------------- screen: learn gate (S18)
-
-function renderLearnGate() {
-  const learnLvl = window._simLearnLevel || 8;
-  const profileLvl = confirmedResult ? confirmedResult.level : 5;
-  return `
-    <div class="screen">
-      <button class="back-btn" onclick="goScreen('my_profile')">&#8249;</button>
-      <div style="flex:1"></div>
-      <div style="display:flex;align-items:center;justify-content:center;height:160px"><img src="level_block.svg" style="width:252px;height:160px;object-fit:contain"></div>
-      <div style="display:flex;flex-direction:column;gap:10px;text-align:center">
-        <div style="font-size:28px;font-weight:600;line-height:1.2">You've finished Level ${learnLvl}</div>
-        <div style="font-size:16px;color:var(--text-secondary);line-height:1.5">Based on your risk profile, Level ${profileLvl} suits you best.</div>
-      </div>
-      <div style="flex:1"></div>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <button class="btn-primary" onclick="goScreen('doorway')">Keep learning</button>
-        <button class="btn-secondary" onclick="goScreen('result')">See my risk profile</button>
-      </div>
-    </div>`;
-}
-
 // ---------------------------------------------------------------- screen: my risk profile (S19)
 
 function renderMyProfile() {
   const r = confirmedResult;
   if (!r) return '<div class="screen"><div>No profile yet.</div></div>';
   const level = r.level;
-  const bandLabel = level <= 5 ? 'Low' : level <= 10 ? 'Moderate' : 'High';
-  const fall = r.largestFall.rupeesPerLakh.toLocaleString('en-IN');
-  const notYetText = level >= 15 ? null : `Level ${level+1} and above`;
-  const tickIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="11" fill="#CFFCE4"/><path d="M7 12.5l3 3 7-7" stroke="#009466" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const dashIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="10" stroke="#98A2B3" stroke-width="2" stroke-dasharray="3 3"/></svg>`;
-  const fallIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><path d="M4 8l6 6 4-4 6 6" stroke="#B03C00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 11v5h-5" stroke="#B03C00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const label = r.label || '';
+  const description = r.description || '';
+  const lowestValue = (r.lowestValueOnALakh || 0).toLocaleString('en-IN');
+  const waveIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="11" fill="#F1EFFC"/><path d="M5 12c2-4 4-4 6 0s4 4 6 0 3-2 3-2" stroke="#6A57E3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const levelsIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 20h4v-5H4zM10 20h4v-9h-4zM16 20h4V5h-4z" stroke="#6A57E3" stroke-width="2" stroke-linejoin="round"/></svg>`;
+  const goalsIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="#6A57E3" stroke-width="2"/><circle cx="12" cy="12" r="3.5" stroke="#6A57E3" stroke-width="2"/></svg>`;
+  const portfolioIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><path d="M16.5 13.5v6M13.5 16.5h6" stroke="#6A57E3" stroke-width="2" stroke-linecap="round"/></svg>`;
   return `
     <div class="screen" style="gap:16px">
-      <button class="back-btn" onclick="goScreen('doorway')">&#8249;</button>
+      <button class="back-btn" onclick="goScreen('start')">&#8249;</button>
       <div style="display:flex;align-items:center;justify-content:center;height:120px"><img src="level_block.svg" style="width:189px;height:120px;object-fit:contain"></div>
       <div style="display:flex;flex-direction:column;gap:6px;text-align:center">
         <span style="font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--brand-purple)">Your risk profile</span>
         <div style="font-size:32px;font-weight:600;line-height:1.15">Level ${level}</div>
-        <div style="font-size:16px;color:var(--text-secondary)">${bandLabel}</div>
+        <div style="font-size:16px;color:var(--text-secondary)">${label}</div>
+        <div style="font-size:16px;line-height:1.5;margin-top:8px">${description}</div>
       </div>
-      <div class="info-card">
-        <div class="info-row" style="display:flex;align-items:center;gap:12px">${tickIcon}<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Open to you</span><span style="font-size:16px;font-weight:600">Levels 1 to ${level}</span></span></div>
-        ${notYetText ? `<div class="info-row" style="display:flex;align-items:center;gap:12px">${dashIcon}<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Not yet</span><span style="font-size:16px;font-weight:600">${notYetText}</span></span></div>` : ''}
-        <div class="info-row" style="display:flex;align-items:center;gap:12px">${fallIcon}<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Largest fall, Level ${level}</span><span style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">Rs ${fall} on a lakh</span></span></div>
+      <div style="display:flex;flex-direction:column;border:1px solid var(--border-default);border-radius:8px">
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 16px">
+          ${waveIcon}
+          <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Biggest dip since 2011</span><span style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">Rs 1,00,000 went to Rs ${lowestValue}</span></span>
+        </div>
       </div>
-      <div style="font-size:13px;color:var(--text-secondary);text-align:center">Assessed 24 Oct 2026. Next review by 24 Oct 2027.</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span style="font-size:13px;color:var(--text-secondary)">Used in every way you invest</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:8px;background:#F7F8FA">${levelsIcon}<span style="font-size:13px;font-weight:600;text-align:center">Levels</span></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:8px;background:#F7F8FA">${goalsIcon}<span style="font-size:13px;font-weight:600;text-align:center">Goals</span></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:8px;background:#F7F8FA">${portfolioIcon}<span style="font-size:13px;font-weight:600;text-align:center">Your own portfolio</span></div>
+        </div>
+      </div>
       <div style="flex:1"></div>
       <button class="btn-primary" onclick="startUpdateFlow()">Update my answers</button>
     </div>`;
@@ -756,28 +743,35 @@ function renderResultUpdated() {
   if (!r) return '<div class="screen">No result.</div>';
   const level = r.level;
   const prevLevel = r.previousLevel || level;
-  const bandLabel = level <= 5 ? 'Low' : level <= 10 ? 'Moderate' : 'High';
-  const fall = r.largestFall.rupeesPerLakh.toLocaleString('en-IN');
-  const notYetText = level >= 15 ? null : `Level ${level+1} and above`;
-  const tickIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="11" fill="#CFFCE4"/><path d="M7 12.5l3 3 7-7" stroke="#009466" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const dashIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="10" stroke="#98A2B3" stroke-width="2" stroke-dasharray="3 3"/></svg>`;
-  const fallIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><path d="M4 8l6 6 4-4 6 6" stroke="#B03C00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 11v5h-5" stroke="#B03C00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const label = r.label || '';
+  const description = r.description || '';
+  const lowestValue = (r.lowestValueOnALakh || 0).toLocaleString('en-IN');
+  const waveIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><circle cx="12" cy="12" r="11" fill="#F1EFFC"/><path d="M5 12c2-4 4-4 6 0s4 4 6 0 3-2 3-2" stroke="#6A57E3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const levelsIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 20h4v-5H4zM10 20h4v-9h-4zM16 20h4V5h-4z" stroke="#6A57E3" stroke-width="2" stroke-linejoin="round"/></svg>`;
+  const goalsIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="#6A57E3" stroke-width="2"/><circle cx="12" cy="12" r="3.5" stroke="#6A57E3" stroke-width="2"/></svg>`;
+  const portfolioIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><path d="M16.5 13.5v6M13.5 16.5h6" stroke="#6A57E3" stroke-width="2" stroke-linecap="round"/></svg>`;
   return `
     <div class="screen" style="gap:16px">
       <div style="display:flex;align-items:center;justify-content:center;height:160px"><img src="level_block.svg" style="width:252px;height:160px;object-fit:contain"></div>
       <div style="display:flex;flex-direction:column;gap:6px;text-align:center">
         <span style="font-size:13px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--brand-purple)">Your risk profile</span>
         <div style="font-size:32px;font-weight:600;line-height:1.15">Level ${level}</div>
-        <div style="font-size:16px;color:var(--text-secondary)">${bandLabel}${level !== prevLevel ? `. Was Level ${prevLevel}.` : ''}</div>
+        <div style="font-size:16px;color:var(--text-secondary)">${label}${level !== prevLevel ? `. Was Level ${prevLevel}.` : ''}</div>
+        <div style="font-size:16px;line-height:1.5;margin-top:8px">${description}</div>
       </div>
-      <a href="#" onclick="event.preventDefault()" class="video-card" style="background:#F1EFFC;text-decoration:none;color:var(--text-primary)">
-        <span class="video-icon">&#9654;</span>
-        <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:16px;font-weight:600">What Level ${level} means</span><span style="font-size:13px;color:var(--text-secondary)">1 min</span></span>
-      </a>
-      <div class="info-card">
-        <div class="info-row" style="display:flex;align-items:center;gap:12px">${tickIcon}<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Open to you</span><span style="font-size:16px;font-weight:600">Levels 1 to ${level}</span></span></div>
-        ${notYetText ? `<div class="info-row" style="display:flex;align-items:center;gap:12px">${dashIcon}<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Not yet</span><span style="font-size:16px;font-weight:600">${notYetText}</span></span></div>` : ''}
-        <div class="info-row" style="display:flex;align-items:center;gap:12px">${fallIcon}<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Largest fall, Level ${level}</span><span style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">Rs ${fall} on a lakh</span></span></div>
+      <div style="display:flex;flex-direction:column;border:1px solid var(--border-default);border-radius:8px">
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 16px">
+          ${waveIcon}
+          <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:13px;color:var(--text-secondary)">Biggest dip since 2011</span><span style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums">Rs 1,00,000 went to Rs ${lowestValue}</span></span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span style="font-size:13px;color:var(--text-secondary)">Used in every way you invest</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:8px;background:#F7F8FA">${levelsIcon}<span style="font-size:13px;font-weight:600;text-align:center">Levels</span></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:8px;background:#F7F8FA">${goalsIcon}<span style="font-size:13px;font-weight:600;text-align:center">Goals</span></div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:8px;background:#F7F8FA">${portfolioIcon}<span style="font-size:13px;font-weight:600;text-align:center">Your own portfolio</span></div>
+        </div>
       </div>
       <div style="flex:1"></div>
       <button class="btn-primary" onclick="goScreen('my_profile')">Done</button>
@@ -835,12 +829,15 @@ async function loadPersona(name) {
   isMinor = false;
 
   if (name === 'ananya') {
-    // Ananya is 15, a minor. Call the entry gate — she should be sent to Request parent.
+    // Ananya is 15, a minor. Reset as minor and call the entry gate.
+    await fetch(`${API}/reset`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ minor: true }) });
     isMinor = true;
-    // Re-create investor as minor
-    // The reset already created a non-minor demo. We need the server to know she's a minor.
-    // For the sim, we just show the request parent screen.
-    currentScreen = 'request_parent';
+    const res = await fetch(`${API}/investment-flows/learn_and_invest/enter`, { method: 'POST' });
+    const data = await res.json();
+    // Gate returns allowed:false, gate:null for a child
+    if (!data.allowed && !data.gate) {
+      currentScreen = 'request_parent';
+    }
     render();
     document.getElementById('persona-select').value = '';
     return;
