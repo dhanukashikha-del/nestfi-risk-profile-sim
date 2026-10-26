@@ -1,16 +1,16 @@
-level,sd_annual_pct,worst_fall_rs_per_lakh,worst_year_terminal_rs,cvar95_monthly_rs,loss_months_pct,riskometer_score,riskometer_band,new_asset_at_level,growth_share_pct
-1,0.5,232,102142,-249,0.0,0,Very Low,Overnight + liquid debt,0.0
-2,1.7,3427,101060,677,8.4,10,Very Low,Short-duration debt (G-Sec 5y),0.0
-3,2.1,4658,100412,910,12.9,14,Low,Long-duration G-Sec (10y),0.0
-4,3.3,4051,98452,1185,24.2,20,Low,Gold,0.0
-5,3.7,8046,99514,1461,19.7,23,Low,Large-cap equity (Nifty 100),16.1
-6,6.3,14217,94246,3193,27.5,42,Moderate,Mid-cap equity (Midcap 150),30.7
-7,7.3,16866,92070,3811,30.3,49,Moderately High,Silver,35.7
-8,9.5,21278,86752,5287,34.3,63,Moderately High,Small-cap equity (Smallcap 250),46.7
-9,10.4,23486,83519,5770,32.0,68,High,11 CNX sectoral indices,58.4
-10,13.6,30720,76140,7831,35.5,89,Very High,4 CNX thematic indices,73.4
-11,13.8,30706,75218,7957,34.9,90,Very High,10% discretionary stocks (Nifty 100),76.0
-12,14.1,31094,74303,8084,35.5,92,Very High,20% discretionary stocks (Nifty 100),79.0
-13,14.8,32613,73679,8656,36.6,96,Very High,30% discretionary stocks (top 250),81.6
-14,15.2,33241,72870,8931,36.6,98,Very High,40% discretionary stocks (top 250),84.0
-15,15.7,33868,72065,9206,37.2,100,Very High,50% discretionary stocks (top 250),86.9
+level,sd_annual_pct,worst_fall_rs_per_lakh,worst_year_terminal_rs,cvar95_monthly_rs,loss_months_pct,riskometer_score,riskometer_band,new_asset_at_level,growth_share_pct,description
+1,0.5,232,102142,-249,0.0,0,Very Low,Overnight + liquid debt,0.0,Your money stays in the safest short-term debt. It barely moves.
+2,1.7,3427,101060,677,8.4,10,Very Low,Short-duration debt (G-Sec 5y),0.0,"Adds short-term government bonds. Small dips, mostly steady."
+3,2.1,4658,100412,910,12.9,14,Low,Long-duration G-Sec (10y),0.0,Adds 10-year government bonds. Moves a little when interest rates change.
+4,3.3,4051,98452,1185,24.2,20,Low,Gold,0.0,"Adds gold, which often holds up when shares fall."
+5,3.7,8046,99514,1461,19.7,23,Low,Large-cap equity (Nifty 100),16.1,Your first shares: India's 100 largest companies.
+6,6.3,14217,94246,3193,27.5,42,Moderate,Mid-cap equity (Midcap 150),30.7,"Adds mid-sized companies. More growth, bigger swings."
+7,7.3,16866,92070,3811,30.3,49,Moderately High,Silver,35.7,"Adds silver, which can rise and fall sharply."
+8,9.5,21278,86752,5287,34.3,63,Moderately High,Small-cap equity (Smallcap 250),46.7,Adds smaller companies. Expect deeper falls in bad years.
+9,10.4,23486,83519,5770,32.0,68,High,11 CNX sectoral indices,58.4,"Adds sector funds, such as banking or IT."
+10,13.6,30720,76140,7831,35.5,89,Very High,4 CNX thematic indices,73.4,Adds theme funds that follow one big idea.
+11,13.8,30706,75218,7957,34.9,90,Very High,10% discretionary stocks (Nifty 100),76.0,"You pick shares for 10% of your money, from India's 100 largest companies."
+12,14.1,31094,74303,8084,35.5,92,Very High,20% discretionary stocks (Nifty 100),79.0,"You pick shares for 20% of your money, from India's 100 largest companies."
+13,14.8,32613,73679,8656,36.6,96,Very High,30% discretionary stocks (top 250),81.6,"You pick shares for 30% of your money, from India's 250 largest companies."
+14,15.2,33241,72870,8931,36.6,98,Very High,40% discretionary stocks (top 250),84.0,"You pick shares for 40% of your money, from India's 250 largest companies."
+15,15.7,33868,72065,9206,37.2,100,Very High,50% discretionary stocks (top 250),86.9,"You pick shares for 50% of your money, from India's 250 largest companies."
