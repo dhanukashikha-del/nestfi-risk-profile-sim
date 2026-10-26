@@ -3,6 +3,7 @@ import path from 'path';
 import { loadConfig, ability, tolerance, reconcile, stressSeedScore, resolveOptionId, NeedInput } from './riskProfile/engine';
 import { RiskProfileDB } from './riskProfile/db';
 import { RiskProfileService, ApiError } from './riskProfile/service';
+import { getRiskProfileStatus, checkInvestmentEntry, INVESTMENT_FLOWS, InvestmentFlow } from './riskProfile/status';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const CONFIG_DIR = path.join(__dirname, '..', 'config', 'riskProfile');
@@ -106,6 +107,19 @@ app.post('/api/risk-profile/monthly-check', (req, res) => {
     if (e instanceof ApiError) return res.status(e.status).json({ error: e.message });
     throw e;
   }
+});
+
+// ---- Per-person status and the investment entry gate
+
+app.get('/api/risk-profile/status', (_req, res) => {
+  res.json(getRiskProfileStatus(db, 'demo'));
+});
+
+app.post('/api/investment-flows/:flow/enter', (req, res) => {
+  const flow = req.params.flow as InvestmentFlow;
+  if (!INVESTMENT_FLOWS.includes(flow)) return res.status(400).json({ error: `Unknown flow: ${flow}` });
+  const result = checkInvestmentEntry(db, 'demo', flow);
+  res.status(result.allowed ? 200 : 409).json(result);
 });
 
 // ---- Reset for reviewers
