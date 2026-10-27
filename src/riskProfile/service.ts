@@ -14,6 +14,7 @@ import {
   NeedInput,
 } from './engine';
 import { IRiskProfileStore } from './db';
+import { checkOpening, OpeningResult } from './opening';
 
 const ENGINE_VERSION = '1.0.0';
 const QUESTION_BANK_VERSION = '2026-10-01';
@@ -191,7 +192,7 @@ export class RiskProfileService {
   }
 
   // ---- 3. POST /risk-profile/confirm
-  confirm(investorId: string) {
+  confirm(investorId: string, learnLevel: number = 0, now: Date = new Date()) {
     const inv = this.guardAdult(investorId);
 
     // Check completeness: all 14 scored + STRESS
@@ -318,6 +319,17 @@ export class RiskProfileService {
     // Clear drafts
     inv.draft_answers.clear();
 
+    // The risk profile confirm counts as the first monthly check, then the first level may open.
+    // The result screen never says which levels are open; Invest reads that separately.
+    const prior = this.db.findOpeningState(investorId);
+    this.db.upsertOpeningState({
+      investor_id: investorId,
+      highest_open_level: prior?.highest_open_level ?? 0,
+      last_opened_on: prior?.last_opened_on ?? null,
+      last_check_on: now.toISOString(),
+    });
+    this.applyOpening(investorId, learnLevel, now);
+
     // Build response
     const level = rec.earned_level;
     const levels = getLevels();
@@ -429,15 +441,58 @@ export class RiskProfileService {
     };
   }
 
+  // ---- shared: which levels are open to invest
+  // One check, used by confirm, can-invest, the monthly check and the daily run.
+  applyOpening(
+    investorId: string,
+    learnLevel: number,
+    now: Date = new Date(),
+    overrides: { daysSinceLastOpened?: number } = {},
+  ): OpeningResult {
+    const profile = this.db.latestProfile(investorId);
+    if (!profile) throw new ApiError(404, 'No profile yet');
+    const day = 1000 * 60 * 60 * 24;
+    const state = this.db.findOpeningState(investorId) ?? {
+      investor_id: investorId,
+      highest_open_level: 0,
+      last_opened_on: null,
+      last_check_on: profile.assessed_on,
+    };
+    const daysSince = (iso: string | null) =>
+      iso == null ? Infinity : Math.floor((now.getTime() - new Date(iso).getTime()) / day);
+    const result = checkOpening({
+      riskProfileLevel: profile.earned_level,
+      learnLevel,
+      highestOpenLevel: state.highest_open_level,
+      daysSinceLastOpened: overrides.daysSinceLastOpened ?? daysSince(state.last_opened_on),
+      daysSinceLastCheck: daysSince(state.last_check_on),
+      monthsSinceProfile: Math.floor(daysSince(profile.assessed_on) / 30.4375),
+    });
+    if (result.highestOpenLevel !== state.highest_open_level) {
+      this.db.insertLevelOpening({
+        investor_id: investorId,
+        opened_on: now.toISOString(),
+        level_before: state.highest_open_level,
+        level_after: result.highestOpenLevel,
+        risk_profile_version: profile.profile_version,
+      });
+      this.db.upsertOpeningState({
+        ...state,
+        highest_open_level: result.highestOpenLevel,
+        last_opened_on: result.opened ? now.toISOString() : state.last_opened_on,
+      });
+    }
+    return result;
+  }
+
   // ---- 7. GET /risk-profile/can-invest
-  canInvest(investorId: string, learnLevel: number | null = null) {
+  canInvest(investorId: string, learnLevel: number | null = null, now: Date = new Date()) {
     this.guardAdult(investorId);
     const profile = this.db.latestProfile(investorId);
     if (!profile) throw new ApiError(404, 'No profile yet');
     const emailLog = this.db.findEmailLog(investorId, profile.profile_version);
     const emailStatus = emailLog?.status ?? 'not_sent';
-    // Email never blocks investing (Step 2.3). Keep recording the status.
-    const canInvest = true;
+    const opening = this.applyOpening(investorId, learnLevel ?? 0, now);
 
     let learnGate = null;
     if (learnLevel != null && learnLevel > profile.earned_level) {
@@ -449,108 +504,76 @@ export class RiskProfileService {
     }
 
     return {
-      canInvest,
-      level: profile.earned_level,
-      earnedLevel: profile.earned_level,
+      canInvest: true,                          // a confirmed profile exists; email never blocks
+      canPlaceOrder: opening.highestOpenLevel > 0 && opening.ordersAllowed,
+      level: profile.earned_level,              // the risk profile level, the ceiling
+      riskProfileLevel: profile.earned_level,
+      highestOpenLevel: opening.highestOpenLevel,
+      nextLevel: opening.nextLevel,
+      nextLevelWaitsFor: opening.waitsFor,
+      daysUntilNextOpens: opening.daysUntilWaitEnds,
+      ordersAllowed: opening.ordersAllowed,
       emailStatus,
-      learnLevel: learnLevel,
+      learnLevel,
       learnGate,
     };
   }
 
   // ---- 8. POST /risk-profile/monthly-check
-  monthlyCheck(investorId: string, input: { nothingChanged: boolean; learnLevel: number; daysAtLevel: number }) {
+  // Nothing changed: the check is saved, then the shared check runs. It never rewrites the
+  // risk profile and never raises the risk profile level; it can only open the next level.
+  monthlyCheck(
+    investorId: string,
+    input: { nothingChanged: boolean; learnLevel: number; daysAtLevel?: number },
+    now: Date = new Date(),
+  ) {
     this.guardAdult(investorId);
     const profile = this.db.latestProfile(investorId);
     if (!profile) throw new ApiError(404, 'No profile yet');
 
-    // If something changed, the investor must go through the update flow
-    if (!input.nothingChanged) {
-      return { moved: false, action: 'update_required' as const, level: profile.earned_level, reasons: [] };
-    }
-
-    // Re-run ability and tolerance from stored answers to get current engine state
-    const answers = this.db.answersForVersion(investorId, profile.profile_version);
-    const abilityAnswers: Record<string, string> = {};
-    for (const a of answers) {
-      if (a.question_code.startsWith('A')) {
-        const r = resolveOptionId(a.option_id);
-        if (r) abilityAnswers[a.question_code] = r.option;
-      }
-    }
-    const ab = ability(abilityAnswers);
-
-    // Tolerance level from the stored profile (no need to recompute)
-    const tolLevel = profile.tolerance_level;
-
-    // Composure
-    const composure = this.db.findComposureState(investorId);
-    const compScore = composure?.score ?? 50;
-
-    // Days since last confirmed profile
-    const daysSinceConfirmed = Math.floor(
-      (Date.now() - new Date(profile.assessed_on).getTime()) / (1000 * 60 * 60 * 24),
-    );
-
-    // Run progression check
-    const prog = progressionCheck(
-      profile.earned_level,
-      ab,
-      tolLevel,
-      input.learnLevel,   // literacy ceiling = the Learn level they've cleared
-      compScore,
-      0,                   // stress events seen — V1 has none
-      input.daysAtLevel,
-      Infinity,            // no adverse event
-      null,                // no deep action
-      null,                // no months since deep
-      daysSinceConfirmed,
-    );
-
-    if (!prog.can_move_up) {
-      return {
-        moved: false,
-        action: 'no_change' as const,
-        level: profile.earned_level,
-        nextLevel: prog.next_level,
-        reasons: prog.reasons,
-      };
-    }
-
-    // Grant one rung: write a new profile row with earned_level + 1
-    const newLevel = profile.earned_level + 1;
-    const newVersion = this.db.nextProfileVersion(investorId);
-    const levels = getLevels();
-    const newLevelRow = levels.find(l => l.level === newLevel)!;
-
-    this.db.insertProfile({
-      ...profile,
-      profile_version: newVersion,
-      assessed_on: new Date().toISOString(),
-      earned_level: newLevel,
-      advice_level: Math.min(newLevel, profile.ability_ceiling),
-      qualified_level: newLevel,
-      engine_version: ENGINE_VERSION,
-      question_bank_version: QUESTION_BANK_VERSION,
+    this.db.insertMonthlyCheck({
+      investor_id: investorId,
+      checked_on: now.toISOString(),
+      nothing_changed: input.nothingChanged,
+      risk_profile_version: profile.profile_version,
     });
 
-    // Copy answers to the new version
-    for (const a of answers) {
-      this.db.insertAnswer({ ...a, profile_version: newVersion });
+    const before = this.db.findOpeningState(investorId)?.highest_open_level ?? 0;
+
+    if (!input.nothingChanged) {
+      return { moved: false, action: 'update_required' as const, level: before, reasons: [] };
     }
 
-    // Send email for the new profile
-    const inv = this.db.getInvestor(investorId)!;
-    this.sendProfileEmail(investorId, newVersion, inv.email);
+    const state = this.db.findOpeningState(investorId);
+    this.db.upsertOpeningState({
+      investor_id: investorId,
+      highest_open_level: state?.highest_open_level ?? 0,
+      last_opened_on: state?.last_opened_on ?? null,
+      last_check_on: now.toISOString(),
+    });
 
+    const opening = this.applyOpening(investorId, input.learnLevel, now, {
+      daysSinceLastOpened: input.daysAtLevel,
+    });
+
+    if (opening.opened) {
+      const levelRow = getLevels().find(l => l.level === opening.highestOpenLevel)!;
+      return {
+        moved: true,
+        action: 'promoted' as const,
+        previousLevel: before,
+        newLevel: opening.highestOpenLevel,
+        level: opening.highestOpenLevel,
+        largestFall: levelRow.worst_fall_rs_per_lakh,
+        reasons: [],
+      };
+    }
     return {
-      moved: true,
-      action: 'promoted' as const,
-      previousLevel: profile.earned_level,
-      newLevel,
-      level: newLevel,
-      largestFall: newLevelRow.worst_fall_rs_per_lakh,
-      reasons: [],
+      moved: false,
+      action: 'no_change' as const,
+      level: opening.highestOpenLevel,
+      nextLevel: opening.nextLevel,
+      reasons: opening.waitsFor,
     };
   }
 

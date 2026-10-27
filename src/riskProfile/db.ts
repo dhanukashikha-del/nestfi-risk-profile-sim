@@ -50,6 +50,31 @@ export interface ComposureStateRow {
   source: 'stress_seed';
 }
 
+// Which levels are open to invest. One row per person (or child's portfolio).
+export interface OpeningStateRow {
+  investor_id: string;
+  highest_open_level: number;     // 0 = nothing open
+  last_opened_on: string | null;  // ISO date of the last opening
+  last_check_on: string;          // ISO date of the last monthly check (risk profile confirm counts)
+}
+
+// Written once per opening, never edited.
+export interface LevelOpeningRow {
+  investor_id: string;
+  opened_on: string;
+  level_before: number;
+  level_after: number;
+  risk_profile_version: number;
+}
+
+// Written once per monthly check, never edited.
+export interface MonthlyCheckRow {
+  investor_id: string;
+  checked_on: string;
+  nothing_changed: boolean;
+  risk_profile_version: number;
+}
+
 export interface InvestorRecord {
   id: string;
   is_minor: boolean;
@@ -72,6 +97,10 @@ export interface IRiskProfileStore {
   profileForVersion(investorId: string, version: number): InvestorProfileRow | undefined;
   findComposureState(investorId: string): ComposureStateRow | undefined;
   upsertComposureState(row: ComposureStateRow): void;
+  findOpeningState(investorId: string): OpeningStateRow | undefined;
+  upsertOpeningState(row: OpeningStateRow): void;
+  insertLevelOpening(row: LevelOpeningRow): void;
+  insertMonthlyCheck(row: MonthlyCheckRow): void;
 }
 
 // ---------------------------------------------------------------- in-memory implementation (tests)
@@ -143,5 +172,27 @@ export class RiskProfileDB implements IRiskProfileStore {
     const idx = this.composure_state.findIndex(r => r.investor_id === row.investor_id);
     if (idx >= 0) this.composure_state[idx] = row;
     else this.composure_state.push(row);
+  }
+
+  opening_state: OpeningStateRow[] = [];
+  level_openings: LevelOpeningRow[] = [];
+  monthly_checks: MonthlyCheckRow[] = [];
+
+  findOpeningState(investorId: string): OpeningStateRow | undefined {
+    return this.opening_state.find(r => r.investor_id === investorId);
+  }
+
+  upsertOpeningState(row: OpeningStateRow): void {
+    const idx = this.opening_state.findIndex(r => r.investor_id === row.investor_id);
+    if (idx >= 0) this.opening_state[idx] = row;
+    else this.opening_state.push(row);
+  }
+
+  insertLevelOpening(row: LevelOpeningRow): void {
+    this.level_openings.push(row);
+  }
+
+  insertMonthlyCheck(row: MonthlyCheckRow): void {
+    this.monthly_checks.push(row);
   }
 }

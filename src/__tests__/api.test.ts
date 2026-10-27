@@ -575,66 +575,67 @@ describe('GET can-invest', () => {
 // ================================================================ POST /risk-profile/monthly-check
 
 describe('POST monthly-check', () => {
-  test('promotes one level when tolerance qualifies, Learn is done, and 30 days passed', () => {
+  // The monthly check opens the next level; it never rewrites the risk profile.
+  const DAY = 24 * 60 * 60 * 1000;
+
+  test('opens the next level when Learn is done, 30 days have passed and the check is confirmed', () => {
     const { db, svc } = freshServiceAndDB();
-    // Arjun: level 7, ability ceiling 9, tolerance level 7.
-    // Monthly check can't promote because tolerance = earned.
-    // Simulate: an investor whose earned is below their qualified level.
-    // This happens when the ratchet granted only one rung in a previous update.
-    submitAndConfirm(svc, db, 'mc1', PERSONA_ANSWERS.arjun.answers, 'HOLD');
-    expect(db.latestProfile('mc1')!.earned_level).toBe(7);
-
-    // Manually set earned_level to 5 to simulate the ratchet having granted
-    // only one rung previously (investor qualifies for 7 but is at 5).
-    (db.latestProfile('mc1')! as any).earned_level = 5;
-    (db.latestProfile('mc1')! as any).tolerance_level = 7;
-
-    // Monthly check: learn cleared to 10, 45 days at level → should promote 5 → 6
-    const result = svc.monthlyCheck('mc1', { nothingChanged: true, learnLevel: 10, daysAtLevel: 45 });
+    submitAndConfirm(svc, db, 'mc1', PERSONA_ANSWERS.arjun.answers, 'HOLD'); // risk profile level 7
+    const t0 = new Date();
+    expect(svc.canInvest('mc1', 5, t0).highestOpenLevel).toBe(5);         // first level, no wait
+    const result = svc.monthlyCheck('mc1', { nothingChanged: true, learnLevel: 10 }, new Date(t0.getTime() + 31 * DAY));
     expect(result.moved).toBe(true);
-    expect(result.newLevel).toBe(6);
     expect(result.previousLevel).toBe(5);
-    const after = db.latestProfile('mc1')!;
-    expect(after.earned_level).toBe(6);
+    expect(result.newLevel).toBe(6);
+    expect(db.latestProfile('mc1')!.earned_level).toBe(7);                 // risk profile level unchanged
+    expect(db.profileForVersion('mc1', 2)).toBeUndefined();                // no new profile row
   });
 
-  test('does not promote when Learn is not done for next level', () => {
+  test('does not open the next level when Learn is not done for it', () => {
     const { db, svc } = freshServiceAndDB();
     submitAndConfirm(svc, db, 'mc2', PERSONA_ANSWERS.arjun.answers, 'HOLD');
-    // Learn only cleared to level 7 (current), not 8
-    const result = svc.monthlyCheck('mc2', { nothingChanged: true, learnLevel: 7, daysAtLevel: 45 });
+    const t0 = new Date();
+    svc.canInvest('mc2', 5, t0);
+    const result = svc.monthlyCheck('mc2', { nothingChanged: true, learnLevel: 5 }, new Date(t0.getTime() + 45 * DAY));
     expect(result.moved).toBe(false);
-    expect(result.reasons).toContain('Module for the next level not completed');
+    expect(result.level).toBe(5);
   });
 
-  test('does not promote before 30 days', () => {
+  test('does not open the next level before 30 days', () => {
     const { db, svc } = freshServiceAndDB();
     submitAndConfirm(svc, db, 'mc3', PERSONA_ANSWERS.arjun.answers, 'HOLD');
-    const result = svc.monthlyCheck('mc3', { nothingChanged: true, learnLevel: 10, daysAtLevel: 15 });
+    const t0 = new Date();
+    svc.canInvest('mc3', 5, t0);
+    const result = svc.monthlyCheck('mc3', { nothingChanged: true, learnLevel: 10 }, new Date(t0.getTime() + 15 * DAY));
     expect(result.moved).toBe(false);
-    expect(result.reasons).toContain('Minimum stay of 30 days not served');
+    expect(result.reasons).toContain('wait');
   });
 
-  test('does not promote past ability ceiling', () => {
+  test('never opens a level above the risk profile level', () => {
     const { db, svc } = freshServiceAndDB();
-    // Suresh: level 4, ability ceiling 12 — no problem there.
-    // Ramesh: level 5, ability ceiling 5 — already at ceiling.
-    submitAndConfirm(svc, db, 'mc4', PERSONA_ANSWERS.ramesh.answers, 'ADD');
-    const result = svc.monthlyCheck('mc4', { nothingChanged: true, learnLevel: 15, daysAtLevel: 60 });
+    submitAndConfirm(svc, db, 'mc4', PERSONA_ANSWERS.ramesh.answers, 'ADD'); // risk profile level 5
+    const t0 = new Date();
+    expect(svc.canInvest('mc4', 15, t0).highestOpenLevel).toBe(5);
+    const result = svc.monthlyCheck('mc4', { nothingChanged: true, learnLevel: 15 }, new Date(t0.getTime() + 60 * DAY));
     expect(result.moved).toBe(false);
-    expect(result.reasons).toContain('Ability ceiling');
+    expect(result.reasons).toContain('risk profile level');
   });
 
-  test('does not promote at level 15', () => {
+  test('nothing opens above Level 15', () => {
     const { db, svc } = freshServiceAndDB();
-    // Directly set up an investor at level 15 by manipulating the DB
     submitAndConfirm(svc, db, 'mc5', PERSONA_ANSWERS.priya.answers, 'ADD');
-    // Manually set earned_level to 15 for this test
-    const profile = db.latestProfile('mc5')!;
-    (profile as any).earned_level = 15;
+    (db.latestProfile('mc5')! as any).earned_level = 15;
+    db.upsertOpeningState({ investor_id: 'mc5', highest_open_level: 15, last_opened_on: '2026-01-01T00:00:00Z', last_check_on: new Date().toISOString() });
     const result = svc.monthlyCheck('mc5', { nothingChanged: true, learnLevel: 15, daysAtLevel: 45 });
     expect(result.moved).toBe(false);
-    expect(result.reasons).toContain('Already at the top of the ladder');
+    expect(result.level).toBe(15);
+  });
+
+  test('the first level opens at the lower of the risk profile level and Learn, with no wait', () => {
+    const { db, svc } = freshServiceAndDB();
+    submitAndConfirm(svc, db, 'mc9', PERSONA_ANSWERS.arjun.answers, 'HOLD'); // risk profile level 7
+    expect(svc.canInvest('mc9', 3).highestOpenLevel).toBe(0);              // below the start level
+    expect(svc.canInvest('mc9', 6).highestOpenLevel).toBe(6);
   });
 
   test('nothingChanged false triggers update flow instead', () => {
