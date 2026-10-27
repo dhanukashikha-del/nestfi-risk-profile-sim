@@ -133,14 +133,30 @@ function render() {
 // ---------------------------------------------------------------- screen: start (choose a flow)
 
 function renderStart() {
+  const levelsIcon = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M4 20h4v-5H4zM10 20h4v-9h-4zM16 20h4V5h-4z" stroke="#6A57E3" stroke-width="2" stroke-linejoin="round"/></svg>`;
+  const goalsIcon = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="#6A57E3" stroke-width="2"/><circle cx="12" cy="12" r="3.5" stroke="#6A57E3" stroke-width="2"/></svg>`;
+  const portfolioIcon = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><path d="M16.5 13.5v6M13.5 16.5h6" stroke="#6A57E3" stroke-width="2" stroke-linecap="round"/></svg>`;
   return `
-    <div class="screen center-screen" style="gap:20px">
-      <div style="font-size:28px;font-weight:600;text-align:center">NESTfi</div>
-      <div style="font-size:16px;color:var(--text-secondary);text-align:center">Choose how you'd like to invest</div>
-      <div style="display:flex;flex-direction:column;gap:10px;width:100%;margin-top:20px">
-        <button class="btn-primary" onclick="enterFlow('learn_and_invest')">Learn and invest</button>
-        <button class="btn-secondary" onclick="enterFlow('goals')">Goals</button>
-        <button class="btn-secondary" onclick="enterFlow('build_your_own')">Build your own portfolio</button>
+    <div class="screen" style="padding:56px 20px 32px;gap:0">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:32px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+          <div style="font-size:15px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--brand-purple)">NESTfi</div>
+          <div style="font-size:24px;font-weight:600;text-align:center;line-height:1.3">How would you like to invest?</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;width:100%">
+          <button type="button" onclick="enterFlow('learn_and_invest')" style="display:flex;align-items:center;gap:16px;padding:18px 20px;border:1px solid var(--border-default);border-radius:12px;background:white;cursor:pointer;text-align:left;font-family:inherit">
+            ${levelsIcon}
+            <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:16px;font-weight:600;color:var(--text-primary)">Learn and invest</span><span style="font-size:13px;color:var(--text-secondary)">Study each level, then invest</span></span>
+          </button>
+          <button type="button" onclick="enterFlow('goals')" style="display:flex;align-items:center;gap:16px;padding:18px 20px;border:1px solid var(--border-default);border-radius:12px;background:white;cursor:pointer;text-align:left;font-family:inherit">
+            ${goalsIcon}
+            <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:16px;font-weight:600;color:var(--text-primary)">Goals</span><span style="font-size:13px;color:var(--text-secondary)">Save towards a target</span></span>
+          </button>
+          <button type="button" onclick="enterFlow('build_your_own')" style="display:flex;align-items:center;gap:16px;padding:18px 20px;border:1px solid var(--border-default);border-radius:12px;background:white;cursor:pointer;text-align:left;font-family:inherit">
+            ${portfolioIcon}
+            <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:16px;font-weight:600;color:var(--text-primary)">Build your own portfolio</span><span style="font-size:13px;color:var(--text-secondary)">Pick your own mix</span></span>
+          </button>
+        </div>
       </div>
     </div>`;
 }
@@ -805,14 +821,21 @@ async function doConfirmUpdate() {
 
 function renderFlowPlaceholder() {
   const labels = { learn_and_invest: 'Learn and invest', goals: 'Goals', build_your_own: 'Build your own portfolio' };
+  const icons = {
+    learn_and_invest: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none"><path d="M4 20h4v-5H4zM10 20h4v-9h-4zM16 20h4V5h-4z" stroke="#6A57E3" stroke-width="2" stroke-linejoin="round"/></svg>`,
+    goals: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="#6A57E3" stroke-width="2"/><circle cx="12" cy="12" r="3.5" stroke="#6A57E3" stroke-width="2"/></svg>`,
+    build_your_own: `<svg width="48" height="48" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><rect x="13" y="4" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><rect x="4" y="13" width="7" height="7" rx="1.5" stroke="#6A57E3" stroke-width="2"/><path d="M16.5 13.5v6M13.5 16.5h6" stroke="#6A57E3" stroke-width="2" stroke-linecap="round"/></svg>`,
+  };
+  const level = confirmedResult ? confirmedResult.level : '—';
+  const lbl = confirmedResult ? confirmedResult.label : '';
   return `
-    <div class="screen center-screen" style="gap:16px">
-      <div style="font-size:48px">&#127919;</div>
-      <div style="font-size:22px;font-weight:600">${labels[returnToFlow] || returnToFlow}</div>
-      <div style="font-size:16px;color:var(--text-secondary);text-align:center">You're in. Your risk profile level is ${confirmedResult ? confirmedResult.level : '—'}.</div>
-      <div class="btn-bottom" style="width:100%">
-        <a href="#" onclick="event.preventDefault();fullReset()" style="display:flex;align-items:center;justify-content:center;height:44px;color:var(--brand-purple);font-size:16px;font-weight:600;text-decoration:none">Start again</a>
+    <div class="screen" style="padding:56px 20px 32px;gap:24px">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;text-align:center">
+        <div style="width:80px;height:80px;border-radius:20px;background:#F1EFFC;display:flex;align-items:center;justify-content:center">${icons[returnToFlow] || ''}</div>
+        <div style="font-size:22px;font-weight:600">${labels[returnToFlow] || ''}</div>
+        <div style="font-size:16px;color:var(--text-secondary);line-height:1.5">Your risk profile is Level ${level} (${lbl}). You can now invest at any level up to ${level}.</div>
       </div>
+      <a href="#" onclick="event.preventDefault();fullReset()" style="display:flex;align-items:center;justify-content:center;height:48px;color:var(--brand-purple);font-size:16px;font-weight:600;text-decoration:none">Start again</a>
     </div>`;
 }
 
