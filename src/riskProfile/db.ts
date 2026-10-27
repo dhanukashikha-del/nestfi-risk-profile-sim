@@ -56,8 +56,7 @@ export interface OpeningStateRow {
   highest_open_level: number;     // 0 = nothing open
   last_opened_on: string | null;  // ISO date of the last opening
   last_check_on: string;          // ISO date of the last monthly check (risk profile confirm counts)
-  held_level?: number;            // level the Learn and invest money sits at, 0 = nothing invested
-  money_moved_on?: string | null; // ISO date money last moved to a new level (first order, move up or down)
+  first_invest_at_highest_on?: string | null; // ISO date of the first investment at the highest open level; reset when a new level opens
 }
 
 // Written once per order placed above the risk profile level, never edited.
@@ -66,6 +65,8 @@ export interface ConsentRow {
   consented_on: string;
   risk_profile_level: number;
   level_chosen: number;
+  household_band: string;
+  wording_version: string;
   risk_profile_version: number;
 }
 
