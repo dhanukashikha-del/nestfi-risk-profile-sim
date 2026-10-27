@@ -634,8 +634,8 @@ describe('POST monthly-check', () => {
   test('the first level opens at the lower of the risk profile level and Learn, with no wait', () => {
     const { db, svc } = freshServiceAndDB();
     submitAndConfirm(svc, db, 'mc9', PERSONA_ANSWERS.arjun.answers, 'HOLD'); // risk profile level 7
-    expect(svc.canInvest('mc9', 3).highestOpenLevel).toBe(0);              // below the start level
-    expect(svc.canInvest('mc9', 6).highestOpenLevel).toBe(6);
+    expect(svc.canInvest('mc9', 0).highestOpenLevel).toBe(0);              // nothing finished in Learn
+    expect(svc.canInvest('mc9', 3).highestOpenLevel).toBe(3);              // start level 1: Level 3 opens
   });
 
   test('nothingChanged false triggers update flow instead', () => {

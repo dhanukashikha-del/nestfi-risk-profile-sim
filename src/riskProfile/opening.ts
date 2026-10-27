@@ -9,7 +9,7 @@
 // The first level opens with no wait, at the lower of the two. After that one level
 // opens at a time, when every condition below is true at the same moment.
 
-export const START_LEVEL_ADULT = 5;          // configuration
+export const START_LEVEL_ADULT = 1;          // configuration, adults and children: Level 1 unless changed
 export const WAIT_DAYS = 30;                 // configuration: days at a level before the next opens
 export const CHECK_VALID_DAYS = 30;          // configuration: a monthly check counts for this long
 export const REVIEW_DUE_MONTHS = 12;         // configuration: yearly review due, no new level opens

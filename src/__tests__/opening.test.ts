@@ -7,10 +7,14 @@ describe('checkOpening', () => {
     expect(checkOpening(base).highestOpenLevel).toBe(6);
     expect(checkOpening({ ...base, riskProfileLevel: 5, learnLevel: 9 }).highestOpenLevel).toBe(5);
   });
-  test('nothing opens when either number is below the start level', () => {
-    expect(checkOpening({ ...base, learnLevel: 3 }).highestOpenLevel).toBe(0);
-    expect(checkOpening({ ...base, riskProfileLevel: 3, learnLevel: 9 }).highestOpenLevel).toBe(0);
-    expect(checkOpening({ ...base, riskProfileLevel: 3 }).waitsFor).toContain('risk profile level');
+  test('default start level is 1: Level 3 opens with risk profile level 5 and Learn at 3', () => {
+    expect(checkOpening({ ...base, riskProfileLevel: 5, learnLevel: 3 }).highestOpenLevel).toBe(3);
+  });
+  test('nothing opens when either number is below a configured start level', () => {
+    expect(checkOpening({ ...base, learnLevel: 3, startLevel: 5 }).highestOpenLevel).toBe(0);
+    expect(checkOpening({ ...base, riskProfileLevel: 3, learnLevel: 9, startLevel: 5 }).highestOpenLevel).toBe(0);
+    expect(checkOpening({ ...base, riskProfileLevel: 3, startLevel: 5 }).waitsFor).toContain('risk profile level');
+    expect(checkOpening({ ...base, learnLevel: 0 }).highestOpenLevel).toBe(0);
   });
   test('next level opens when every condition is true', () => {
     const r = checkOpening({ ...base, highestOpenLevel: 6, learnLevel: 7, daysSinceLastOpened: 30, daysSinceLastCheck: 5 });
