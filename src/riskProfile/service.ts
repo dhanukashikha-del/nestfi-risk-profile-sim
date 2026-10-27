@@ -464,8 +464,8 @@ export class RiskProfileService {
       riskProfileLevel: profile.earned_level,
       learnLevel,
       highestOpenLevel: state.highest_open_level,
-      daysSinceLastOpened: overrides.daysSinceLastOpened ?? daysSince(state.last_opened_on),
-      daysSinceLastCheck: daysSince(state.last_check_on),
+      heldLevel: state.held_level ?? 0,
+      daysSinceMoneyMoved: overrides.daysSinceLastOpened ?? daysSince(state.money_moved_on ?? null),
       monthsSinceProfile: Math.floor(daysSince(profile.assessed_on) / 30.4375),
     });
     if (result.highestOpenLevel !== state.highest_open_level) {
@@ -511,12 +511,54 @@ export class RiskProfileService {
       highestOpenLevel: opening.highestOpenLevel,
       nextLevel: opening.nextLevel,
       nextLevelWaitsFor: opening.waitsFor,
-      daysUntilNextOpens: opening.daysUntilWaitEnds,
+      daysUntilNextOpens: opening.daysUntilMoveUp,
+      moveUpTo: opening.moveUpTo,
+      consentAbove: opening.consentAbove,
+      reviewAsked: opening.reviewAsked,
       ordersAllowed: opening.ordersAllowed,
       emailStatus,
       learnLevel,
       learnGate,
     };
+  }
+
+  // ---- Investing at a level. Checks the level is open, asks for consent above the risk profile
+  // level, and starts the 30 days whenever money moves to a new level.
+  recordInvestment(
+    investorId: string,
+    input: { level: number; learnLevel: number; consent?: boolean },
+    now: Date = new Date(),
+  ) {
+    this.guardAdult(investorId);
+    const profile = this.db.latestProfile(investorId);
+    if (!profile) throw new ApiError(404, 'No profile yet');
+    const opening = this.applyOpening(investorId, input.learnLevel, now);
+    const state = this.db.findOpeningState(investorId)!;
+    const held = state.held_level ?? 0;
+    const allowed =
+      input.level >= 1 && (
+        (held === 0 && input.level <= opening.highestOpenLevel) ||
+        (held > 0 && input.level <= held) ||
+        (held > 0 && input.level === opening.moveUpTo));
+    if (!allowed) throw new ApiError(409, 'Level not open to this money yet');
+    if (input.level > profile.earned_level) {
+      if (!input.consent) return { placed: false, warningNeeded: true, suitsLevel: profile.earned_level };
+      this.db.insertConsent({
+        investor_id: investorId,
+        consented_on: now.toISOString(),
+        risk_profile_level: profile.earned_level,
+        level_chosen: input.level,
+        risk_profile_version: profile.profile_version,
+      });
+    }
+    const moved = input.level !== held;
+    this.db.upsertOpeningState({
+      ...state,
+      highest_open_level: Math.max(state.highest_open_level, input.level),
+      held_level: input.level,
+      money_moved_on: moved ? now.toISOString() : state.money_moved_on ?? null,
+    });
+    return { placed: true, warningNeeded: false, level: input.level, clockRestarted: moved };
   }
 
   // ---- 8. POST /risk-profile/monthly-check

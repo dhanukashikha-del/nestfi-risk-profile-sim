@@ -729,3 +729,34 @@ describe('Step 2.5: draft expiry and answeredAt ordering', () => {
     expect(inv.draft_answers.get('A1')!.option_id).toBe('A1_LT3');
   });
 });
+
+// ================================================================ investing at a level
+
+describe('recordInvestment', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  test('money moves up one level, 30 days after it last moved; same-level top ups do not restart', () => {
+    const { db, svc } = freshServiceAndDB();
+    submitAndConfirm(svc, db, 'ri1', PERSONA_ANSWERS.arjun.answers, 'HOLD'); // risk profile level 7
+    const t0 = new Date();
+    expect(svc.recordInvestment('ri1', { level: 3, learnLevel: 3 }, t0).placed).toBe(true);
+    expect(() => svc.recordInvestment('ri1', { level: 4, learnLevel: 4 }, new Date(t0.getTime() + 1 * DAY)))
+      .toThrow(expect.objectContaining({ status: 409 }));
+    const topUp = svc.recordInvestment('ri1', { level: 3, learnLevel: 4 }, new Date(t0.getTime() + 20 * DAY));
+    expect(topUp.clockRestarted).toBe(false);
+    expect(svc.recordInvestment('ri1', { level: 4, learnLevel: 4 }, new Date(t0.getTime() + 30 * DAY)).placed).toBe(true);
+  });
+
+  test('investing above the risk profile level needs the warning and consent', () => {
+    const { db, svc } = freshServiceAndDB();
+    submitAndConfirm(svc, db, 'ri2', PERSONA_ANSWERS.arjun.answers, 'HOLD');
+    svc.recordInvestment('ri2', { level: 7, learnLevel: 7 });
+    (db.latestProfile('ri2')! as any).earned_level = 5;                  // risk profile level falls
+    const warned = svc.recordInvestment('ri2', { level: 7, learnLevel: 7 });
+    expect(warned.placed).toBe(false);
+    expect(warned.warningNeeded).toBe(true);
+    expect(svc.recordInvestment('ri2', { level: 7, learnLevel: 7, consent: true }).placed).toBe(true);
+    expect(db.consents).toHaveLength(1);
+    expect(svc.recordInvestment('ri2', { level: 5, learnLevel: 7 }).placed).toBe(true); // moving down, no wait
+  });
+});

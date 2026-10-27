@@ -56,6 +56,17 @@ export interface OpeningStateRow {
   highest_open_level: number;     // 0 = nothing open
   last_opened_on: string | null;  // ISO date of the last opening
   last_check_on: string;          // ISO date of the last monthly check (risk profile confirm counts)
+  held_level?: number;            // level the Learn and invest money sits at, 0 = nothing invested
+  money_moved_on?: string | null; // ISO date money last moved to a new level (first order, move up or down)
+}
+
+// Written once per order placed above the risk profile level, never edited.
+export interface ConsentRow {
+  investor_id: string;
+  consented_on: string;
+  risk_profile_level: number;
+  level_chosen: number;
+  risk_profile_version: number;
 }
 
 // Written once per opening, never edited.
@@ -101,6 +112,7 @@ export interface IRiskProfileStore {
   upsertOpeningState(row: OpeningStateRow): void;
   insertLevelOpening(row: LevelOpeningRow): void;
   insertMonthlyCheck(row: MonthlyCheckRow): void;
+  insertConsent(row: ConsentRow): void;
 }
 
 // ---------------------------------------------------------------- in-memory implementation (tests)
@@ -194,5 +206,11 @@ export class RiskProfileDB implements IRiskProfileStore {
 
   insertMonthlyCheck(row: MonthlyCheckRow): void {
     this.monthly_checks.push(row);
+  }
+
+  consents: ConsentRow[] = [];
+
+  insertConsent(row: ConsentRow): void {
+    this.consents.push(row);
   }
 }
