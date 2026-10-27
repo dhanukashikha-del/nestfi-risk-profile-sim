@@ -578,7 +578,7 @@ describe('POST monthly-check', () => {
   // The monthly check opens the next level; it never rewrites the risk profile.
   const DAY = 24 * 60 * 60 * 1000;
 
-  test('opens the next level when Learn is done, 30 days have passed and the check is confirmed', () => {
+  test('opens every finished level up to the risk profile level when the check is confirmed', () => {
     const { db, svc } = freshServiceAndDB();
     submitAndConfirm(svc, db, 'mc1', PERSONA_ANSWERS.arjun.answers, 'HOLD'); // risk profile level 7
     const t0 = new Date();
@@ -586,7 +586,7 @@ describe('POST monthly-check', () => {
     const result = svc.monthlyCheck('mc1', { nothingChanged: true, learnLevel: 10 }, new Date(t0.getTime() + 31 * DAY));
     expect(result.moved).toBe(true);
     expect(result.previousLevel).toBe(5);
-    expect(result.newLevel).toBe(6);
+    expect(result.newLevel).toBe(7);                                       // Learn at 10, ceiling 7
     expect(db.latestProfile('mc1')!.earned_level).toBe(7);                 // risk profile level unchanged
     expect(db.profileForVersion('mc1', 2)).toBeUndefined();                // no new profile row
   });
@@ -601,14 +601,14 @@ describe('POST monthly-check', () => {
     expect(result.level).toBe(5);
   });
 
-  test('does not open the next level before 30 days', () => {
+  test('opens a finished level the same day, with no 30 day wait', () => {
     const { db, svc } = freshServiceAndDB();
     submitAndConfirm(svc, db, 'mc3', PERSONA_ANSWERS.arjun.answers, 'HOLD');
     const t0 = new Date();
     svc.canInvest('mc3', 5, t0);
-    const result = svc.monthlyCheck('mc3', { nothingChanged: true, learnLevel: 10 }, new Date(t0.getTime() + 15 * DAY));
-    expect(result.moved).toBe(false);
-    expect(result.reasons).toContain('wait');
+    const result = svc.monthlyCheck('mc3', { nothingChanged: true, learnLevel: 6 }, new Date(t0.getTime() + 2 * DAY));
+    expect(result.moved).toBe(true);
+    expect(result.newLevel).toBe(6);
   });
 
   test('never opens a level above the risk profile level', () => {

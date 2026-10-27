@@ -16,21 +16,23 @@ describe('checkOpening', () => {
     expect(checkOpening({ ...base, riskProfileLevel: 3, startLevel: 5 }).waitsFor).toContain('risk profile level');
     expect(checkOpening({ ...base, learnLevel: 0 }).highestOpenLevel).toBe(0);
   });
-  test('next level opens when every condition is true', () => {
-    const r = checkOpening({ ...base, highestOpenLevel: 6, learnLevel: 7, daysSinceLastOpened: 30, daysSinceLastCheck: 5 });
+  test('a finished level opens at once, with no wait between levels', () => {
+    const r = checkOpening({ ...base, highestOpenLevel: 6, learnLevel: 7, daysSinceLastOpened: 1, daysSinceLastCheck: 5 });
     expect(r.opened).toBe(true);
     expect(r.highestOpenLevel).toBe(7);
   });
-  test('only one level per check, even with Learn far ahead', () => {
-    expect(checkOpening({ ...base, highestOpenLevel: 6, learnLevel: 8, daysSinceLastOpened: 90 }).highestOpenLevel).toBe(7);
+  test('several finished levels open together, up to the risk profile level', () => {
+    expect(checkOpening({ ...base, highestOpenLevel: 6, learnLevel: 8, daysSinceLastOpened: 2 }).highestOpenLevel).toBe(8);
+    expect(checkOpening({ ...base, highestOpenLevel: 3, learnLevel: 12, daysSinceLastOpened: 0 }).highestOpenLevel).toBe(8);
   });
-  test('waits for the 30 days and says how many are left', () => {
-    const r = checkOpening({ ...base, highestOpenLevel: 6, learnLevel: 7, daysSinceLastOpened: 10 });
-    expect(r.waitsFor).toEqual(['wait']);
-    expect(r.daysUntilWaitEnds).toBe(20);
+  test('worked example: risk profile 5, Level 3 on 20 Oct, Level 4 on 25 Oct opens that day', () => {
+    const first = checkOpening({ ...base, riskProfileLevel: 5, learnLevel: 3 });
+    expect(first.highestOpenLevel).toBe(3);
+    const next = checkOpening({ ...base, riskProfileLevel: 5, learnLevel: 4, highestOpenLevel: 3, daysSinceLastOpened: 5, daysSinceLastCheck: 5 });
+    expect(next.highestOpenLevel).toBe(4);
   });
   test('waits for the monthly check after 30 days without one', () => {
-    expect(checkOpening({ ...base, highestOpenLevel: 6, learnLevel: 7, daysSinceLastOpened: 40, daysSinceLastCheck: 30 }).waitsFor).toEqual(['monthly check']);
+    expect(checkOpening({ ...base, highestOpenLevel: 6, learnLevel: 7, daysSinceLastOpened: 1, daysSinceLastCheck: 30 }).waitsFor).toEqual(['monthly check']);
   });
   test('never opens above the risk profile level', () => {
     const r = checkOpening({ ...base, highestOpenLevel: 8, learnLevel: 9, daysSinceLastOpened: 60 });
@@ -46,6 +48,7 @@ describe('checkOpening', () => {
   test('market fall hold and the 90 day wait hold the next level', () => {
     const r = checkOpening({ ...base, highestOpenLevel: 6, learnLevel: 7, daysSinceLastOpened: 60, marketFallHold: true, coolingOffDaysLeft: 10 });
     expect(r.waitsFor).toEqual(['market fall hold', '90 day wait']);
+    expect(r.daysUntilWaitEnds).toBe(10);
   });
   test('nothing waiting when nothing is finished above the highest open level', () => {
     expect(checkOpening({ ...base, highestOpenLevel: 6, learnLevel: 6, daysSinceLastOpened: 5 }).waitsFor).toEqual([]);
